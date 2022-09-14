@@ -1123,12 +1123,12 @@ while True:
 # - Make sure step is not send when HEAD is not done rotating
 
 
-# Init video recording
-video_out = cv2.VideoWriter('output_video.avi',cv2.VideoWriter_fourcc(*'DIVX'), 5, debug_window_dim)
-# Video
-video_out.write(image_np)
-#
-video_out.release()
+## Init video recording
+#video_out = cv2.VideoWriter('output_video.avi',cv2.VideoWriter_fourcc(*'DIVX'), 5, debug_window_dim)
+## Video
+#video_out.write(image_np)
+##
+#video_out.release()
 
 
 
