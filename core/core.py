@@ -72,18 +72,16 @@ if MODEL_AUTO_EN:
         TFLITE_EN   = True
         TFLITE_PC   = False
         EDGE_TPU_EN = True
-        MODEL_DIR   = 'lite1_model/'
+        MODEL_DIR   = '../../18_08_2022_efficientdet-lite1_e75_b32_s2000/'
     else:
         TFLITE_EN   = True
         TFLITE_PC   = True
         EDGE_TPU_EN = False
-        #MODEL_DIR   = '../tflite_custom_models/18_08_2022_efficientdet-lite1_e75_b32_s2000/'
         MODEL_DIR   = '../../../../tflite_custom_models/good/18_08_2022_efficientdet-lite1_e75_b32_s2000/'
 else:
     TFLITE_EN   = True
     TFLITE_PC   = True
     EDGE_TPU_EN = False
-    #MODEL_DIR   = '../tflite_custom_models/18_08_2022_efficientdet-lite1_e75_b32_s2000/'
     MODEL_DIR   = '../../../../tflite_custom_models/good/18_08_2022_efficientdet-lite1_e75_b32_s2000/'
 
 
