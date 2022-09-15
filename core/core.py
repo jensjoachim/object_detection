@@ -54,9 +54,6 @@ DRAW_STRONGEST_DET = True
 # Draw status
 DRAW_STATUS = True
 
-# Camera in own thread
-CAM_OWN_THREAD = False
-
 # Max detections to be processed per detector
 global DET_MAX_PROC
 DET_MAX_PROC = 7
@@ -736,10 +733,7 @@ def keyboard_command(wait_key_in):
     global videostream
     # Stop
     if wait_key_in == ord('q'):
-        if CAM_OWN_THREAD:
-            videostream.stop()
-        else:
-            cap.release()
+        cap.release()
         cv2.destroyAllWindows()
         print('Exit print')
         return 0
@@ -841,26 +835,18 @@ def init_bad_frames_detected():
         bad_frames_detected_arr.append(0)
 
 
-# Select if to run camera in its own thread
-#global videostream
-if CAM_OWN_THREAD:
-    # Initialize video stream
-    videostream = VideoStream(resolution=(0,0)).start()
-    time.sleep(1)
-    cam_window_width  = videostream.get_resolution_w()
-    cam_window_height = videostream.get_resolution_h()
-else:
-    # Start video capture
-    cap = cv2.VideoCapture(CAM_SELECT)
-    # Set maximum dimmension
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-    cap.set(3, 10000)
-    cap.set(4, 10000)
-    # Check actual dimmension 
-    cam_window_width  = int(cap.get(3))
-    cam_window_height = int(cap.get(4))
-    # Enable real-time
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+# Start video capture
+cap = cv2.VideoCapture(CAM_SELECT)
+# Set maximum dimmension
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+cap.set(3, 10000)
+cap.set(4, 10000)
+# Check actual dimmension 
+cam_window_width  = int(cap.get(3))
+cam_window_height = int(cap.get(4))
+# Enable real-time
+cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     
 print('cam_window_width:  '+str(cam_window_width))
 print('cam_window_height: '+str(cam_window_height))
@@ -936,10 +922,7 @@ for area in DET_AREA_COORD:
     detections_list.append([])
     
     # Get frame
-    if CAM_OWN_THREAD:
-        frame = videostream.read()
-    else:
-        ret, frame = cap.read()
+    ret, frame = cap.read()
     image_np = np.array(frame)
 
     # Crop input image
@@ -964,10 +947,7 @@ while True:
         detections_index = tracking_area
     
     # Get frame
-    if CAM_OWN_THREAD:
-        frame = videostream.read()
-    else:
-        ret, frame = cap.read()
+    ret, frame = cap.read()
     image_np = np.array(frame)
 
     # Crop input image
