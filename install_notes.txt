@@ -1,6 +1,12 @@
 # Objecte detection Coral Edge TPU installation
 https://github.com/EdjeElectronics/TensorFlow-Lite-Object-Detection-on-Android-and-Raspberry-Pi/
 
+# Other neede packages
+python3 -m pip install tensorflow_hub
+python3 -m pip install Pillow
+python3 -m pip install serial
+python3 -m pip install matplotlib
+
 # Info how to set training parameters
 https://stackoverflow.com/questions/35050753/how-big-should-batch-size-and-number-of-epochs-be-when-fitting-a-model
 https://towardsdatascience.com/how-to-split-a-tensorflow-dataset-into-train-validation-and-test-sets-526c8dd29438
