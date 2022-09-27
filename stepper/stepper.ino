@@ -45,7 +45,7 @@ LIDARLite_v4LED myLidarLite;
 #define TriggerPin    13
 
 // Stepper Configuration
-const unsigned int STEP_SELECT = 8;
+const unsigned int STEP_SELECT = 6;
 const unsigned int STEP_MULT = 1<<(STEP_SELECT-1);
 const unsigned int STEPS_PHYS = 400;
 const unsigned int STEPS_LOGIC = STEPS_PHYS * STEP_MULT;

@@ -166,64 +166,6 @@ for color in COLORS:
 print(color_selection)
 
 
-# Functions - Video
-
-# Define VideoStream class to handle streaming of video from webcam in separate processing thread
-# Source - Adrian Rosebrock, PyImageSearch: https://www.pyimagesearch.com/2015/12/28/increasing-raspberry-pi-fps-with-python-and-opencv/
-class VideoStream:
-    """Camera object that controls video streaming from the Picamera"""
-    def __init__(self,resolution):
-        # Initialize the PiCamera and the camera image stream
-        self.stream = cv2.VideoCapture(0)
-        # Set maximum dimmension
-        self.stream.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        self.stream.set(3, 10000)
-        self.stream.set(4, 10000)
-        # Check actual dimmension 
-        self.cam_window_width  = int(self.stream.get(3))
-        self.cam_window_height = int(self.stream.get(4))
-        # Enable real-time
-        self.stream.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-            
-        # Read first frame from the stream
-        (self.grabbed, self.frame) = self.stream.read()
-
-	# Variable to control when the camera is stopped
-        self.stopped = False
-
-    def start(self):
-	# Start the thread that reads frames from the video stream
-        Thread(target=self.update,args=()).start()
-        return self
-    
-    def get_resolution_w(self):
-        return self.cam_window_width
-    
-    def get_resolution_h(self):
-        return self.cam_window_height
-
-    def update(self):
-        # Keep looping indefinitely until the thread is stopped
-        while True:
-            # If the camera is stopped, stop the thread
-            if self.stopped:
-                # Close camera resources
-                self.stream.release()
-                return
-
-            # Otherwise, grab the next frame from the stream
-            (self.grabbed, self.frame) = self.stream.read()
-            
-        time.sleep(0.2)
-
-    def read(self):
-	# Return the most recent frame
-        return self.frame
-
-    def stop(self):
-	# Indicate that the camera and thread should be stopped
-        self.stopped = True
-
 
 # Functions - Drawing
 
@@ -598,8 +540,11 @@ def head_init(serialportin):
     global head_ready       
     global head_logic_steps 
     global head_step_index  
+    global head_step_recv
     global head_distance  
     global serialPort
+    global head_write_en
+    head_write_en = 1
     # See available serial ports
     if HEAD_SEE_COM_PORTS == 1:
         import serial.tools.list_ports as port_list
@@ -618,6 +563,7 @@ def head_init(serialportin):
     head_ready       = 0
     head_logic_steps = 0
     head_step_index  = 0
+    head_step_recv   = 1
     head_distance    = 0
     head_print_info('Waiting for HEAD to be up and running...')
     head_wait_for('ready')
@@ -627,6 +573,7 @@ def head_read():
     global head_ready
     global head_logic_steps
     global head_step_index
+    global head_step_recv
     global head_distance
     
     # Read data out of the buffer until a carraige return / new line is found
@@ -648,6 +595,7 @@ def head_read():
         head_step_index  = int(serialStringSplit[1])/2 # Starts at 180 degrees
     if "Step:" == serialStringSplit[0]:    
         head_step_index = int(serialStringSplit[1])
+        head_step_recv = 1
     if "Dist:" == serialStringSplit[0]:       
         head_distance = int(serialStringSplit[1])
 
@@ -730,7 +678,6 @@ def keyboard_command(wait_key_in):
     global cap
     global HEAD_EN
     global head_logic_steps
-    global videostream
     # Stop
     if wait_key_in == ord('q'):
         cap.release()
@@ -739,6 +686,15 @@ def keyboard_command(wait_key_in):
         return 0
     # If HEAD is connected
     if HEAD_EN == 1:
+        # Stop/Start wrinting head
+        global head_write_en
+        if wait_key_in == ord('s'):
+            if head_write_en == 1:
+                print('ENABLE ENABLE')
+                head_write_en = 0
+            else:
+                print('DISABLE DISABLE')
+                head_write_en = 1
         # Rotate Right
         if wait_key_in == ord('a'):
             head_write_int(int(head_logic_steps/32))
@@ -776,14 +732,14 @@ DETECTION_AREA_IN = [[1.00,0.0,0.0],
 # Dumb state info in log
 EN_STATE_PRINT_LOG      = 0
 # Dumb state info in terminal
-EN_STATE_PRINT_TERMINAL = 0
+EN_STATE_PRINT_TERMINAL = 1
 # Dubm state ingo in window
 EN_STATE_PRINT_WINDOW   = 0
 
 # Dumb head info in log
 EN_HEAD_PRINT_LOG      = 0
 # Dumb head info in terminal
-EN_HEAD_PRINT_TERMINAL = 0
+EN_HEAD_PRINT_TERMINAL = 1
 # Dumb head ingo in window
 EN_HEAD_PRINT_WINDOW   = 0
 
@@ -801,7 +757,7 @@ DEBUG_WINDOW_MAX_EN     = 0
 
 # Enable connection to HEAD
 # (Arduino controlling stepper mouted with webcam and proximity sensor)
-HEAD_EN = 0
+HEAD_EN = 1
 HEAD_SEE_COM_PORTS = 1
 
 # Number of good detected frames in order to enter TRACKING state
@@ -904,11 +860,16 @@ PRINT_HEAD_INFO_WINDOW  = ['Start of head log']
 
 # Enable HEAD
 if HEAD_EN == 1:    
-    head_ready       = 0
-    head_logic_steps = 0
-    head_step_index  = 0
-    head_distance    = 0
-    head_init("COM5")
+    global head_ready       
+    global head_logic_steps 
+    global head_step_index  
+    global head_step_recv 
+    global head_distance
+    global head_write_en
+    if os.name == 'posix':
+        head_init("/dev/ttyUSB0")
+    else:
+        head_init("COM5")
     global serialPort
     
 # Do one detections for all areas
@@ -941,6 +902,10 @@ while True:
     
     # Take time
     take_time(0)
+    
+    # Service HEAD
+    if HEAD_EN == 1:   
+        head_read_all()
     
     # When tracking only look at one area
     if current_state == TRACKING and TRACKING_EN:
@@ -976,12 +941,24 @@ while True:
         else:
             good_frames_detected_arr[detections_index].append(0)
     
+    # Find strongest detection
+    found_max, max_score, i_tmp, j_tmp = find_strongest_detection(detection_list_tmp, 0)
+    
+    # Send rotation to head
+    if found_max and max_score >= MIN_DECTETION_SCORE:
+        if head_step_recv == 1 and head_write_en == 1:
+            head_step_recv = 0
+            detections_tmp = detection_list_tmp[i_tmp]
+            size_x = detections_tmp['detection_boxes'][j_tmp][3] - detections_tmp['detection_boxes'][j_tmp][1]
+            center_x = detections_tmp['detection_boxes'][j_tmp][1] + size_x/2
+            center_x = center_x-0.5
+            center_x = int(center_x * head_logic_steps/8)
+            print("center_x: "+str(center_x))
+            head_write_int(center_x)
+            
+    
     # Resize for debug window
     image_np = cv2.resize(image_np,debug_window_dim)
-    
-    # Service HEAD
-    if HEAD_EN == 1:   
-        head_read_all()
 
     # Draw all detections areas 
     if DRAW_ALL_DET_AREA:
@@ -997,7 +974,7 @@ while True:
         draw_detections_list(detection_list_tmp, detections_index_start, image_np) 
     
     # Draw strongest detection  
-    found_max, max_score, i_tmp, j_tmp = find_strongest_detection(detection_list_tmp, 0)
+    #found_max, max_score, i_tmp, j_tmp = find_strongest_detection(detection_list_tmp, 0)
     if found_max and DRAW_STRONGEST_DET:
         draw_strongest_detection(detection_list_tmp, max_score, i_tmp, j_tmp, image_np, '#0000ff', detections_index_start)
     

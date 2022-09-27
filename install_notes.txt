@@ -7,6 +7,13 @@ python3 -m pip install Pillow
 python3 -m pip install serial
 python3 -m pip install matplotlib
 
+# Arduino install
+https://electropeak.com/learn/install-arduino-ide-on-raspberry-pi/
+# Arduino lidar lib
+https://github.com/garmin/LIDARLite_Arduino_Library/releases/tag/3.0.6
+# Arduino stepper driver
+https://github.com/sparkfun/SparkFun_ProDriver_TC78H670FTG_Arduino_Library/releases/tag/v1.0.1
+
 # Info how to set training parameters
 https://stackoverflow.com/questions/35050753/how-big-should-batch-size-and-number-of-epochs-be-when-fitting-a-model
 https://towardsdatascience.com/how-to-split-a-tensorflow-dataset-into-train-validation-and-test-sets-526c8dd29438
