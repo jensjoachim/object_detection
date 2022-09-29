@@ -558,6 +558,9 @@ def head_init(serialportin):
     except NameError:
         head_print_info("SerialPort not opened yet")
     serialPort = serial.Serial(port=serialportin, baudrate=115200, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
+    #serialPort = serial.Serial(port=serialportin, baudrate=115200, timeout=None)
+    #self.port = serial.Serial(port_s, baudrate=9600, timeout=None)	
+    
     # Wait until Ready and capture logical steps
     # (Programmed in arduino)
     head_ready       = 0
@@ -617,6 +620,7 @@ def head_write_int(val):
     global serialPort
     head_read_all()
     serialPort.write(b'%d' % (val))
+    serialPort.write(b'\n')
 
 def head_print_info(txt):
     
@@ -690,10 +694,8 @@ def keyboard_command(wait_key_in):
         global head_write_en
         if wait_key_in == ord('s'):
             if head_write_en == 1:
-                print('ENABLE ENABLE')
                 head_write_en = 0
             else:
-                print('DISABLE DISABLE')
                 head_write_en = 1
         # Rotate Right
         if wait_key_in == ord('a'):
@@ -946,13 +948,16 @@ while True:
     
     # Send rotation to head
     if found_max and max_score >= MIN_DECTETION_SCORE:
-        if head_step_recv == 1 and head_write_en == 1:
+        #if head_step_recv == 1 and head_write_en == 1:
+        if head_write_en == 1:
             head_step_recv = 0
             detections_tmp = detection_list_tmp[i_tmp]
             size_x = detections_tmp['detection_boxes'][j_tmp][3] - detections_tmp['detection_boxes'][j_tmp][1]
             center_x = detections_tmp['detection_boxes'][j_tmp][1] + size_x/2
             center_x = center_x-0.5
-            center_x = int(center_x * head_logic_steps/8)
+            #center_x = int(center_x * head_logic_steps/8)
+            center_x = int(center_x * head_logic_steps/12)
+            #center_x = int(center_x * head_logic_steps/16)
             print("center_x: "+str(center_x))
             head_write_int(center_x)
             

@@ -45,7 +45,7 @@ LIDARLite_v4LED myLidarLite;
 #define TriggerPin    13
 
 // Stepper Configuration
-const unsigned int STEP_SELECT = 6;
+const unsigned int STEP_SELECT = 7;
 const unsigned int STEP_MULT = 1<<(STEP_SELECT-1);
 const unsigned int STEPS_PHYS = 400;
 const unsigned int STEPS_LOGIC = STEPS_PHYS * STEP_MULT;
@@ -184,7 +184,7 @@ void loop() {
       Serial.print("Step: ");
       Serial.println(get_step_index());
     }
-  }
+  } 
 
   // Handle distance measument
   if (measurement_ongoing == 0) {
@@ -205,76 +205,7 @@ void loop() {
       measurement_ongoing = 0;
     }
   }
-
-
-    
-
-//  uint8_t inputChar;
-//  const uint16_t num_of_steps = 10;
-//
-//  // Read Serial
-//
-//  if (Serial.available()) {
-//    //  read input character ...
-//    inputChar = (uint8_t) Serial.read();
-//
-//    // ... and parse
-//    switch (inputChar) {
-//      
-//      case '1':
-//        DBG_LEVEL = 1;
-//        Serial.println("Debug level set to 1.");
-//        print_menu();
-//        break;
-//        
-//      case '2':
-//        DBG_LEVEL = 2;
-//        Serial.println("Debug level set to 2.");
-//        print_menu();
-//        break;
-//        
-//      case '3':
-//        DBG_LEVEL = 3;
-//        Serial.println("Debug level set to 3.");
-//        print_menu();
-//        break;
-//        
-//      case 'q':
-//        step_scan_simple(num_of_steps*STEP_MULT, 0);
-//        print_menu();
-//        break;
-//
-//      case 'w':
-//        step_scan_simple(num_of_steps*STEP_MULT, 1);
-//        print_menu();
-//        break;
-//
-//      case 'a':
-//        step_simple_step(num_of_steps*STEP_MULT, 0, 1);
-//        print_menu();
-//        break;
-//
-//      case 's':
-//        step_simple_step(num_of_steps*STEP_MULT, 1, 1);
-//        print_menu();
-//        break;
-//
-//      case 'z':
-//        myProDriver.enable();
-//        Serial.println("Stepper Motor Drive Enabled.");
-//        print_menu();
-//        break;
-//
-//      case 'x':
-//        myProDriver.disable();
-//        Serial.println("Stepper Motor Drive Disabled.");
-//        print_menu();
-//        break;
-//
-//      default:
-//        break;
-//    }
-//  }
+  
 }
 
 void getDist(uint16_t * distance)
@@ -286,17 +217,6 @@ void reboot() {
   wdt_disable();
   wdt_enable(WDTO_15MS);
   while (1) {}
-}
-
-void print_menu ( ) {
-  Serial.println("Programs available:");
-  Serial.println("1-3. : Set Debug Level");
-  Serial.println("q.   : Scan Rotate Left");
-  Serial.println("w.   : Scan Rotate Right");
-  Serial.println("a.   : Rotate Left");
-  Serial.println("s.   : Rotate Right");
-  Serial.println("z.   : Enabled Stepper Motor");
-  Serial.println("x.   : Disabled Stepper Motor");
 }
 
 void update_step_index ( bool direction ) {
@@ -352,138 +272,9 @@ void step_simple_step( uint16_t steps, bool direction, uint8_t clockDelay )
     pinMode(myProDriver.settings.mode2Pin, INPUT); // let on-board external pullup to 3.3V pull this pin HIGH
     delay(clockDelay);
     update_step_index(direction);
-  }
-}
-
-void distanceSingleGpio(uint16_t * distance)
-{
-    // 1. Trigger range measurement.
-    myLidarLite.takeRangeGpio(TriggerPin, MonitorPin);
-
-    // 2. Wait for busyFlag to indicate device is idle.
-    myLidarLite.waitForBusyGpio(MonitorPin);
-
-    // 3. Read new distance data from device registers
-    *distance = myLidarLite.readDistance();
-}
-
-void step_scan_simple( uint16_t steps, bool direction )
-{
-  uint16_t distance;
-  unsigned long time_start;
-  unsigned long time_end;
-  unsigned long time_diff;
-
-  Serial.println("data: start ");
-  
-  // Set direction 
-  step_set_dir(direction);
-
-  // Start timer
-  time_start = micros();
-
-  // Run Scan 
-  for(uint16_t i = 0 ; i < steps ; i++)
-  {
-
-    // Do one measurement
-    distanceSingleGpio(&distance);
-
-    // Move Stepper
-    pinMode(myProDriver.settings.mode2Pin, OUTPUT);
-    digitalWrite(myProDriver.settings.mode2Pin, LOW);
-    delayMicroseconds(1); 
-    pinMode(myProDriver.settings.mode2Pin, INPUT); 
-
-    //// Read Status
-    //uint8_t statusByte = 0;
-    //myLidarLite.read(0x01, &statusByte, 1);
-
-    // Print
-    Serial.print("data:");
-    Serial.print(" ");
-    Serial.print(get_step_index());
-    Serial.print(" ");
-    Serial.print(distance);
-    //Serial.print(" ");
-    //Serial.print(statusByte,HEX);
-    Serial.println(" ");
-
-    // Update index
-    update_step_index(direction);
-  }
-
-  Serial.println("data: stop ");
-
-  // Stop Timer
-  time_end = micros();
-  time_diff = time_end - time_start;
-
-  // Print timer
-  unsigned long time_us;
-  unsigned long time_ms;
-  unsigned long time_s;
-  
-  time_us = time_diff % 1000;
-  time_ms = (time_diff / 1000) % 1000;
-  time_s  = time_diff / 1000 / 1000;
-  Serial.print("Scan Time: ");
-  Serial.print(time_s);
-  Serial.print("s ");
-  Serial.print(time_ms);
-  Serial.print("ms ");
-  Serial.print(time_us);
-  Serial.println("us");
-  
-  time_us = (time_diff/steps) % 1000;
-  time_ms = ((time_diff/steps) / 1000) % 1000;
-  time_s  = (time_diff/steps) / 1000 / 1000;
-  Serial.print("Avg. Step Time time: ");
-  Serial.print(time_s);
-  Serial.print("s ");
-  Serial.print(time_ms);
-  Serial.print("ms ");
-  Serial.print(time_us);
-  Serial.println("us");
-}
-
-void step_scan( uint16_t steps, bool direction )
-{
-  // Set direction 
-  step_set_dir(direction);
-
-  //
-  unsigned long time_start;
-  unsigned long time_end;
-  unsigned long time_diff;
-
-  // Run Scan 
-  for(uint16_t i = 0 ; i < steps ; i++)
-  {
-    if (0) {
-    // 
-    time_start = micros();
-
-    // Start Measurement
-    //myLidarLite.takeRangeGpio(TriggerPin, MonitorPin);
-
-    // Step Motor
-    if (0) {
-      pinMode(myProDriver.settings.mode2Pin, OUTPUT);
-      digitalWrite(myProDriver.settings.mode2Pin, LOW);
-      delayMicroseconds(1); // even out the clock signal, error check takes about 2uSec
-      //delay(clockDelay);
-      pinMode(myProDriver.settings.mode2Pin, INPUT); // let on-board external pullup to 3.3V pull this pin HIGH
-      delay(2);
+    // Break if any new value incoming
+    if (Serial.available()) {
+      break;
     }
-
-    // End measurement
-
-      time_end = micros();
-      time_diff = time_end - time_start;
-
-      //*distance = myLidarLite.readDistance();
-    }
-    
   }
 }
