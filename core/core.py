@@ -67,6 +67,9 @@ HEAD_GAIN = 1.0/14
 # (Set in radians)
 HEAD_LIM_SENSE = 0.001
 
+# SCANNING Settings
+
+
 # Model Selection
 
 # Automatic model selection regarding if testing on PC or RaspberryPi+EdgeTPU
@@ -636,6 +639,12 @@ def head_write_int(val):
     serialPort.write(b'%d' % (val))
     serialPort.write(b'\n')
 
+def head_write(str_in):
+    global serialPort
+    head_read_all()
+    serialPort.write(str_in.encode('utf_8'))
+    serialPort.write(b'\n')
+
 def head_print_info(txt):
     
     # This function should be able to print following
@@ -711,14 +720,15 @@ def keyboard_command(wait_key_in):
                 head_write_en = 0
             else:
                 head_write_en = 1
+        # Re-center degreess to 180 degreess
+        if wait_key_in == ord('r'):
+            head_write('re-center')
         # Rotate Right
         if wait_key_in == ord('a'):
             head_write_int(int(head_logic_steps/32))
-            #head_wait_for('Step:')
         # Rotate Left
         if wait_key_in == ord('d'):
             head_write_int(-1*int(head_logic_steps/32))
-            #head_wait_for('Step:')
             
     return 1
 

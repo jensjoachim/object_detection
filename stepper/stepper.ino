@@ -173,6 +173,10 @@ void loop() {
       return_message_enable = 1;
     } else if (str == "return_disable") {
       return_message_enable = 0;
+    } else if (str == "re-center") {
+      set_step_index(STEPS_LOGIC/2);
+      Serial.print("Step: ");
+      Serial.println(get_step_index());
     } else { // Rotate Head
       val_int = str.toInt();
       if (val_int < 0) {
@@ -237,6 +241,10 @@ void update_step_index ( bool direction ) {
 
 uint16_t get_step_index () {
   return step_index;
+}
+
+void set_step_index (uint16_t step_index_in) {
+  step_index = step_index_in;
 }
 
 void step_set_dir ( bool direction ) 
