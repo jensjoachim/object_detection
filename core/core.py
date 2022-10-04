@@ -34,13 +34,16 @@ import statistics
 
 
 # Sensitivity for each detection
-MIN_DECTETION_SCORE = 0.45
+#MIN_DECTETION_SCORE = 0.45
+MIN_DECTETION_SCORE = 0.50
 
 # Remove detection if they are on bounday. 
 # It seems to be a good idea, since many faulty detections is occuring.
 # Also the tracking will lock onto the window, so its best to be enabled.
 BOUNDARY_SENSITIVITY = 0.01
 BOUNDARY_DETECTIONS_ON = True
+# It's good to have another sensitivity before entering tracking
+BOUNDARY_SENSITIVITY_SCANNING = 0.1
 
 # Draw all detection areas
 DRAW_ALL_DET_AREA = True
@@ -58,6 +61,11 @@ DRAW_STATUS = True
 global DET_MAX_PROC
 DET_MAX_PROC = 7
 
+# Head configuration: Set gain level per dectertion center offset
+HEAD_GAIN = 1.0/14
+# Head configuration: Set when when not to move head anymore when target is in center
+# (Set in radians)
+HEAD_LIM_SENSE = 0.001
 
 # Model Selection
 
@@ -482,17 +490,23 @@ def run_detector_area(img, area):
         loop_range = range(DET_MAX_PROC)
     
     # Remove detections on boundary
+    global SCANNING
+    global current_state
+    if current_state == SCANNING:
+        bound_sens = BOUNDARY_SENSITIVITY_SCANNING
+    else:
+        bound_sens = BOUNDARY_SENSITIVITY
     if BOUNDARY_DETECTIONS_ON == True:
         for j in loop_range:
-            if detections['detection_boxes'][j][0] <= BOUNDARY_SENSITIVITY:
+            if detections['detection_boxes'][j][0] <= bound_sens:
                 detections['detection_scores'][j] = 0.0
-            if detections['detection_boxes'][j][1] <= BOUNDARY_SENSITIVITY:
+            if detections['detection_boxes'][j][1] <= bound_sens:
                 detections['detection_scores'][j] = 0.0
-            if detections['detection_boxes'][j][2] >= (1.0 - BOUNDARY_SENSITIVITY):
+            if detections['detection_boxes'][j][2] >= (1.0 - bound_sens):
                 detections['detection_scores'][j] = 0.0
-            if detections['detection_boxes'][j][3] >= (1.0 - BOUNDARY_SENSITIVITY):
+            if detections['detection_boxes'][j][3] >= (1.0 - bound_sens):
                 detections['detection_scores'][j] = 0.0
-  
+
     # Scale detection boxes
     for j in loop_range: 
         detections['detection_boxes'][j][0] = (detections['detection_boxes'][j][0] - 0.5) * area[1] + 0.5 + area[3]
@@ -763,12 +777,19 @@ HEAD_EN = 1
 HEAD_SEE_COM_PORTS = 1
 
 # Number of good detected frames in order to enter TRACKING state
-GOOD_FRAMES_DETECTED = 3
+GOOD_FRAMES_DETECTED = 2
 global good_frames_detected_arr
 # Number of bad frames in order to exit SCANNING state
 BAD_FRAMES_DETECTED = 10
 global bad_frames_detected_arr
 
+
+global SCANNING
+global TRACKING
+global SCANNING_EN
+global TRACKING_EN
+global current_state
+global tracking_area
 SCANNING = 0
 TRACKING = 1
 SCANNING_EN = 1
@@ -947,20 +968,17 @@ while True:
     found_max, max_score, i_tmp, j_tmp = find_strongest_detection(detection_list_tmp, 0)
     
     # Send rotation to head
-    if found_max and max_score >= MIN_DECTETION_SCORE:
-        #if head_step_recv == 1 and head_write_en == 1:
+    if found_max and max_score >= MIN_DECTETION_SCORE and current_state == TRACKING:
         if head_write_en == 1:
             head_step_recv = 0
             detections_tmp = detection_list_tmp[i_tmp]
             size_x = detections_tmp['detection_boxes'][j_tmp][3] - detections_tmp['detection_boxes'][j_tmp][1]
             center_x = detections_tmp['detection_boxes'][j_tmp][1] + size_x/2
             center_x = center_x-0.5
-            #center_x = int(center_x * head_logic_steps/8)
-            center_x = int(center_x * head_logic_steps/12)
-            #center_x = int(center_x * head_logic_steps/16)
-            print("center_x: "+str(center_x))
-            head_write_int(center_x)
-            
+            center_x = int(center_x * head_logic_steps * HEAD_GAIN)
+            if abs(center_x) >= int(head_logic_steps * HEAD_LIM_SENSE):
+                print("center_x: "+str(center_x))
+                head_write_int(center_x)
     
     # Resize for debug window
     image_np = cv2.resize(image_np,debug_window_dim)
@@ -979,7 +997,6 @@ while True:
         draw_detections_list(detection_list_tmp, detections_index_start, image_np) 
     
     # Draw strongest detection  
-    #found_max, max_score, i_tmp, j_tmp = find_strongest_detection(detection_list_tmp, 0)
     if found_max and DRAW_STRONGEST_DET:
         draw_strongest_detection(detection_list_tmp, max_score, i_tmp, j_tmp, image_np, '#0000ff', detections_index_start)
     
@@ -990,7 +1007,6 @@ while True:
             bad_frames_detected_arr.append(0)
         else:
             bad_frames_detected_arr.append(1)
-            
             
     # Calculate Mean X,Y and Var X,Y
     if current_state == TRACKING:
