@@ -62,12 +62,16 @@ global DET_MAX_PROC
 DET_MAX_PROC = 7
 
 # Head configuration: Set gain level per dectertion center offset
-HEAD_GAIN = 1.0/14
+HEAD_TRACKING_GAIN = 1.0/14
 # Head configuration: Set when when not to move head anymore when target is in center
 # (Set in radians)
-HEAD_LIM_SENSE = 0.001
+HEAD_TRACKING_LIM_SENSE = 0.001
+# Scanning step radians
+HEAD_SCANNING_STEP = 0.02
+# Scanning width angle
+HEAD_SCANNING_W_ANGLE = 0.25
 
-# SCANNING Settings
+
 
 
 # Model Selection
@@ -937,8 +941,34 @@ while True:
     take_time(0)
     
     # Service HEAD
-    if HEAD_EN == 1:   
+    if HEAD_EN == 1:
+        # Read status
         head_read_all()
+        # Rotate head if SCANNING
+        if current_state == SCANNING:
+            # Make "n" fill scans before rotating head
+            # (n=GOOD_FRAMES_DETECTED)
+            frame_index_tmp = detections_number % (len(DET_AREA_COORD) * (GOOD_FRAMES_DETECTED+1))
+            if frame_index_tmp == 0:
+                head_scan_step_tmp      = int(HEAD_SCANNING_STEP * head_logic_steps / 2)
+                head_scan_curr_tmp      = 1/head_logic_steps * head_step_index * 2
+                head_scan_curr_step_tmp = int(head_scan_curr_tmp * head_logic_steps / 2)
+                head_scan_max_tmp       = 1.0 + HEAD_SCANNING_W_ANGLE
+                head_scan_max_step_tmp  = int(head_scan_max_tmp * head_logic_steps / 2)
+                head_scan_min_tmp       = 1.0 - HEAD_SCANNING_W_ANGLE
+                head_scan_min_step_tmp  = int(head_scan_min_tmp * head_logic_steps / 2)
+                #print("head_scan_step_tmp:      "+str(head_scan_step_tmp))
+                #print("head_scan_curr_tmp:      "+str(head_scan_curr_tmp))
+                #print("head_scan_max_tmp:       "+str(head_scan_max_tmp))
+                #print("head_scan_min_tmp:       "+str(head_scan_min_tmp))
+                #print("head_scan_curr_step_tmp: "+str(head_scan_curr_step_tmp))
+                #print("head_scan_max_step_tmp:  "+str(head_scan_max_step_tmp))
+                #print("head_scan_min_step_tmp:  "+str(head_scan_min_step_tmp))
+                if head_scan_curr_tmp >= head_scan_max_tmp:
+                    head_write_int(-1*(head_scan_max_step_tmp-head_scan_min_step_tmp))
+                else:
+                    head_write_int(head_scan_step_tmp)
+
     
     # When tracking only look at one area
     if current_state == TRACKING and TRACKING_EN:
@@ -985,8 +1015,8 @@ while True:
             size_x = detections_tmp['detection_boxes'][j_tmp][3] - detections_tmp['detection_boxes'][j_tmp][1]
             center_x = detections_tmp['detection_boxes'][j_tmp][1] + size_x/2
             center_x = center_x-0.5
-            center_x = int(center_x * head_logic_steps * HEAD_GAIN)
-            if abs(center_x) >= int(head_logic_steps * HEAD_LIM_SENSE):
+            center_x = int(center_x * head_logic_steps * HEAD_TRACKING_GAIN)
+            if abs(center_x) >= int(head_logic_steps * HEAD_TRACKING_LIM_SENSE):
                 print("center_x: "+str(center_x))
                 head_write_int(center_x)
     
@@ -1106,7 +1136,7 @@ while True:
 
 
 #TODO:
-# - Make sure step is not send when HEAD is not done rotating
+# - Make sure logging functions are working
 
 
 ## Init video recording
