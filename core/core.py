@@ -31,6 +31,7 @@ from threading import Thread
 import importlib.util
 import matplotlib.pyplot as plt
 import statistics
+import logging
 
 
 # Sensitivity for each detection
@@ -67,11 +68,21 @@ HEAD_TRACKING_GAIN = 1.0/14
 # (Set in radians)
 HEAD_TRACKING_LIM_SENSE = 0.001
 # Scanning step radians
-HEAD_SCANNING_STEP = 0.02
+#HEAD_SCANNING_STEP = 0.02
+HEAD_SCANNING_STEP = 0.04
 # Scanning width angle
-HEAD_SCANNING_W_ANGLE = 0.25
+HEAD_SCANNING_W_ANGLE = 0.10
 
 
+# Dumb state info in log
+EN_STATE_PRINT_LOG      = 1
+# Dumb state info in terminal
+EN_STATE_PRINT_TERMINAL = 1
+
+# Dumb head info in log
+EN_HEAD_PRINT_LOG      = 1
+# Dumb head info in terminal
+EN_HEAD_PRINT_TERMINAL = 1
 
 
 # Model Selection
@@ -557,6 +568,7 @@ def calculate_detection_areas():
 # Functions - HEAD
 
 def head_init(serialportin):
+    global head_log_file 
     global HEAD_SEE_COM_PORTS
     global head_ready       
     global head_logic_steps 
@@ -564,8 +576,22 @@ def head_init(serialportin):
     global head_step_recv
     global head_distance  
     global serialPort
-    global head_write_en
-    head_write_en = 1
+    global head_write_scanning_en
+    global head_write_tracking_en
+    head_write_scanning_en = 1
+    head_write_tracking_en = 1
+
+    # Open log file
+    if EN_HEAD_PRINT_LOG == 1:
+        head_log_file = open("head_log.txt", "a")
+
+        # Set up logging
+        log = "bot.log"
+        logging.basicConfig(filename=log,level=logging.DEBUG,format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+        #logging.info('Log Entry Here.')
+        
+        head_print_info("Start of Head")
+
     # See available serial ports
     if HEAD_SEE_COM_PORTS == 1:
         import serial.tools.list_ports as port_list
@@ -579,8 +605,6 @@ def head_init(serialportin):
     except NameError:
         head_print_info("SerialPort not opened yet")
     serialPort = serial.Serial(port=serialportin, baudrate=115200, bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
-    #serialPort = serial.Serial(port=serialportin, baudrate=115200, timeout=None)
-    #self.port = serial.Serial(port_s, baudrate=9600, timeout=None)	
     
     # Wait until Ready and capture logical steps
     # (Programmed in arduino)
@@ -653,7 +677,6 @@ def head_print_info(txt):
     
     # This function should be able to print following
     # - In terminal
-    # - On display
     # - Dump in file
     
     # Add header
@@ -661,17 +684,14 @@ def head_print_info(txt):
 
     # Dumb state info in log
     if EN_HEAD_PRINT_LOG == 1:
-        print('ENABLE_STATE_LOG is not implemented')
+        #print('ENABLE_STATE_LOG is not implemented')
+        global head_log_file
+        head_log_file.write(txt+"\n")
+        logging.info(txt)
         
     # Dumb state info in terminal
     if EN_HEAD_PRINT_TERMINAL == 1:
         print(txt_dump)
-        
-    # Dumb state into in window
-    if EN_HEAD_PRINT_WINDOW == 1:
-        PRINT_HEAD_INFO_WINDOW.insert(0,txt_dump)
-        if len(PRINT_HEAD_INFO_WINDOW) > 50:
-            PRINT_HEAD_INFO_WINDOW.pop(50)
 
 
 # Functions - Time Measurement
@@ -718,12 +738,18 @@ def keyboard_command(wait_key_in):
     # If HEAD is connected
     if HEAD_EN == 1:
         # Stop/Start wrinting head
-        global head_write_en
-        if wait_key_in == ord('s'):
-            if head_write_en == 1:
-                head_write_en = 0
+        global head_write_scanning_en
+        if wait_key_in == ord('1'):
+            if head_write_scanning_en == 1:
+                head_write_scanning_en = 0
             else:
-                head_write_en = 1
+                head_write_scanning_en = 1
+        global head_write_tracking_en
+        if wait_key_in == ord('2'):
+            if head_write_tracking_en == 1:
+                head_write_tracking_en = 0
+            else:
+                head_write_tracking_en = 1
         # Re-center degreess to 180 degreess
         if wait_key_in == ord('r'):
             head_write('re-center')
@@ -758,20 +784,6 @@ DETECTION_AREA_IN = [[1.00,0.0,0.0],
 #DETECTION_AREA = [[0.25,0.5,0.5]]
 #DETECTION_AREA = [[0.75,0.5,0.5]]
 #DETECTION_AREA = [[1.0,0.5,0.5]]
-
-# Dumb state info in log
-EN_STATE_PRINT_LOG      = 0
-# Dumb state info in terminal
-EN_STATE_PRINT_TERMINAL = 1
-# Dubm state ingo in window
-EN_STATE_PRINT_WINDOW   = 0
-
-# Dumb head info in log
-EN_HEAD_PRINT_LOG      = 0
-# Dumb head info in terminal
-EN_HEAD_PRINT_TERMINAL = 1
-# Dumb head ingo in window
-EN_HEAD_PRINT_WINDOW   = 0
 
 
 # Camera Select
@@ -891,10 +903,6 @@ cycle_time_total = 0
 cycle_time_avg   = 0
 init_time()
 
-# Clear logs
-PRINT_STATE_INFO_WINDOW = ['Start of state log']
-PRINT_HEAD_INFO_WINDOW  = ['Start of head log']
-
 # Enable HEAD
 if HEAD_EN == 1:    
     global head_ready       
@@ -902,7 +910,8 @@ if HEAD_EN == 1:
     global head_step_index  
     global head_step_recv 
     global head_distance
-    global head_write_en
+    global head_write_scanning_en
+    global head_write_tracking_en
     if os.name == 'posix':
         head_init("/dev/ttyUSB0")
     else:
@@ -949,7 +958,7 @@ while True:
             # Make "n" fill scans before rotating head
             # (n=GOOD_FRAMES_DETECTED)
             frame_index_tmp = detections_number % (len(DET_AREA_COORD) * (GOOD_FRAMES_DETECTED+1))
-            if frame_index_tmp == 0:
+            if frame_index_tmp == 0 and head_write_scanning_en == 1:
                 head_scan_step_tmp      = int(HEAD_SCANNING_STEP * head_logic_steps / 2)
                 head_scan_curr_tmp      = 1/head_logic_steps * head_step_index * 2
                 head_scan_curr_step_tmp = int(head_scan_curr_tmp * head_logic_steps / 2)
@@ -1009,7 +1018,7 @@ while True:
     
     # Send rotation to head
     if found_max and max_score >= MIN_DECTETION_SCORE and current_state == TRACKING:
-        if head_write_en == 1:
+        if head_write_tracking_en == 1:
             head_step_recv = 0
             detections_tmp = detection_list_tmp[i_tmp]
             size_x = detections_tmp['detection_boxes'][j_tmp][3] - detections_tmp['detection_boxes'][j_tmp][1]
@@ -1133,6 +1142,12 @@ while True:
                 init_bad_frames_detected()
         
 #### End of loop ####
+
+# Close open log files
+if EN_HEAD_PRINT_LOG == 1:
+    global head_log_file 
+    head_log_file.close()
+
 
 
 #TODO:
