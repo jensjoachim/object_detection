@@ -74,15 +74,60 @@ HEAD_SCANNING_STEP = 0.04
 HEAD_SCANNING_W_ANGLE = 0.10
 
 
+# Dumb core info in log
+EN_CORE_PRINT_LOG       = 1
+# Dumb state info in terminal
+EN_CORE_PRINT_TERMINAL  = 1
+
 # Dumb state info in log
 EN_STATE_PRINT_LOG      = 1
 # Dumb state info in terminal
 EN_STATE_PRINT_TERMINAL = 1
 
 # Dumb head info in log
-EN_HEAD_PRINT_LOG      = 1
+EN_HEAD_PRINT_LOG       = 1
 # Dumb head info in terminal
-EN_HEAD_PRINT_TERMINAL = 1
+EN_HEAD_PRINT_TERMINAL  = 1
+
+# Setup logging
+log = "all.log"
+logging.basicConfig(filename=log,level=logging.DEBUG,format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+
+
+def core_print_info(txt):
+    
+    # This function should be able to print following
+    # - In terminal
+    # - Dump in file
+    
+    # Add header
+    txt_dump = 'Core:  '+txt
+
+    # Dumb state info in log
+    if EN_CORE_PRINT_LOG == 1:
+        logging.info(txt_dump)
+        
+    # Dumb state info in terminal
+    if EN_CORE_PRINT_TERMINAL == 1:
+        print(txt_dump)
+core_print_info("Start of Core")
+
+def state_print_info(txt):
+    
+    # This function should be able to print following
+    # - In terminal
+    # - Dump in file
+    
+    # Add header
+    txt_dump = 'State: '+txt
+
+    # Dumb state info in log
+    if EN_STATE_PRINT_LOG == 1:
+        logging.info(txt_dump)
+        
+    # Dumb state info in terminal
+    if EN_STATE_PRINT_TERMINAL == 1:
+        print(txt_dump)
 
 
 # Model Selection
@@ -126,22 +171,22 @@ if TFLITE_EN:
     if TFLITE_PC: 
         if EDGE_TPU_EN:
             # Edge TPU TFLITE
-            print('No support for Edge TPU on PC...')
+            core_print_info('No support for Edge TPU on PC...')
             exit()
         else:
             # float16 TFLITE
             interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'model_float16.tflite'))
-            print('Loading TFLITE Float16...')
+            core_print_info('Loading TFLITE Float16...')
     else:
         if EDGE_TPU_EN:
             # Edge TPU TFLITE
             interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'edge_tpu_2','model_default_edgetpu.tflite'),
                                       experimental_delegates=[load_delegate('libedgetpu.so.1.0')])
-            print('Loading TFLITE for Edge TPU...')
+            core_print_info('Loading TFLITE for Edge TPU...')
         else:
             # Default TFLITE
             interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'model_default.tflite'))
-            print('Loading TFLITE Default...')
+            core_print_info('Loading TFLITE Default...')
     # Allocate    
     interpreter.allocate_tensors()
     # Get model details
@@ -149,7 +194,7 @@ if TFLITE_EN:
     output_details = interpreter.get_output_details()
     height = input_details[0]['shape'][1]
     width = input_details[0]['shape'][2]
-    print('H: '+str(height)+' W: '+str(width))
+    core_print_info('H: '+str(height)+' W: '+str(width))
     tflite_model_height = height
     tflite_model_width  = width
 
@@ -169,7 +214,7 @@ if TFLITE_EN:
 else:
     import tensorflow as tf
     # Print Tensorflow version
-    print('Tensorflow version: '+tf.__version__)
+    core_print_info('Tensorflow version: '+tf.__version__)
     # Init Model
     detect_fn = tf.saved_model.load(MODEL_DIR+'saved_model/')
 
@@ -181,15 +226,20 @@ lines_labels_file = labels_file.readlines()
 i = 1
 for line in lines_labels_file:
     category_index[i] = {'id': i, 'name': line.split('\n')[0]}
+    core_print_info("\'id\': "+str(i)+", \'name\': "+line.split('\n')[0])
     i = i + 1
-print(category_index)
+#print(category_index)
 # Define a list of colors for visualization
 np.random.seed(1931)
 COLORS = np.random.randint(25, 230, size=(i, 3), dtype=np.uint8)
 color_selection = []
+i = 1
 for color in COLORS:
     color_selection.append('#{0:02x}{1:02x}{1:02x}'.format(color[2],color[1],color[0]))
-print(color_selection)
+    core_print_info("\'id\': "+str(i)+", "+'#{0:02x}{1:02x}{1:02x}'.format(color[2],color[1],color[0]))    
+    i = i + 1
+#print(color_selection)
+
 
 
 
@@ -204,7 +254,7 @@ try:
         # Windows
         font = ImageFont.truetype("C:/Windows/Fonts/Arial/ariblk.ttf",15)
 except IOError:
-    print("Font not found, using default font.")
+    core_print_info("Font not found, using default font.")
     font = ImageFont.load_default() 
 
 def draw_boxes(image, index, boxes, class_names, scores, max_boxes=10, min_score=0.1):
@@ -541,7 +591,7 @@ def run_detector_area(img, area):
     return detections, det_ok
 
 def calculate_detection_areas():
-    print('Detection areas:')
+    core_print_info('Detection areas:')
     global DETECTION_AREA_IN
     global DETECTION_AREA
     global DET_AREA_COORD
@@ -561,14 +611,13 @@ def calculate_detection_areas():
         d = int(cam_window_height*(0.5+area[1]/2+area[3])) 
         DET_AREA_COORD.append([dim_w, dim_h , a, b, c, d])
         # Print coodinates for detection areas wiht its dimmentions
-        print(str(i+1)+': '+str(dim_w)+'x'+str(dim_h)+' '+str(a)+','+str(b)+','+str(c)+','+str(d))
+        core_print_info(str(i+1)+': '+str(dim_w)+'x'+str(dim_h)+' '+str(a)+','+str(b)+','+str(c)+','+str(d))
         i=i+1
 
 
 # Functions - HEAD
 
 def head_init(serialportin):
-    global head_log_file 
     global HEAD_SEE_COM_PORTS
     global head_ready       
     global head_logic_steps 
@@ -580,17 +629,8 @@ def head_init(serialportin):
     global head_write_tracking_en
     head_write_scanning_en = 1
     head_write_tracking_en = 1
-
-    # Open log file
-    if EN_HEAD_PRINT_LOG == 1:
-        head_log_file = open("head_log.txt", "a")
-
-        # Set up logging
-        log = "bot.log"
-        logging.basicConfig(filename=log,level=logging.DEBUG,format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
-        #logging.info('Log Entry Here.')
-        
-        head_print_info("Start of Head")
+    
+    head_print_info("Start of Head")
 
     # See available serial ports
     if HEAD_SEE_COM_PORTS == 1:
@@ -680,14 +720,11 @@ def head_print_info(txt):
     # - Dump in file
     
     # Add header
-    txt_dump = 'Head: '+txt
+    txt_dump = 'Head:  '+txt
 
     # Dumb state info in log
     if EN_HEAD_PRINT_LOG == 1:
-        #print('ENABLE_STATE_LOG is not implemented')
-        global head_log_file
-        head_log_file.write(txt+"\n")
-        logging.info(txt)
+        logging.info(txt_dump)
         
     # Dumb state info in terminal
     if EN_HEAD_PRINT_TERMINAL == 1:
@@ -719,8 +756,8 @@ def take_time(en_print):
     cycle_time_avg_arr.pop(cycle_time_avg_arr_size)
     cycle_time_avg     = statistics.mean(cycle_time_avg_arr)
     if en_print == 1:
-        print('cycle_time_total: '+str(cycle_time_total))
-        print('cycle_time_avg:   '+str(cycle_time_avg))
+        core_print_info('cycle_time_total: '+str(cycle_time_total))
+        core_print_info('cycle_time_avg:   '+str(cycle_time_avg))
 
 
 # Functions - Keyboard Input
@@ -733,7 +770,7 @@ def keyboard_command(wait_key_in):
     if wait_key_in == ord('q'):
         cap.release()
         cv2.destroyAllWindows()
-        print('Exit print')
+        core_print_info('Exit print')
         return 0
     # If HEAD is connected
     if HEAD_EN == 1:
@@ -853,8 +890,8 @@ cam_window_height = int(cap.get(4))
 # Enable real-time
 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     
-print('cam_window_width:  '+str(cam_window_width))
-print('cam_window_height: '+str(cam_window_height))
+core_print_info('cam_window_width:  '+str(cam_window_width))
+core_print_info('cam_window_height: '+str(cam_window_height))
 
 # Init scanning parameters
 init_good_frames_detected()
@@ -895,8 +932,8 @@ else:
     debug_window_height = cam_window_height
     debug_window_width  = cam_window_width
     debug_window_dim    = (debug_window_width,debug_window_height)
-print('debug_window_width:  '+str(debug_window_width))
-print('debug_window_height: '+str(debug_window_height))
+core_print_info('debug_window_width:  '+str(debug_window_width))
+core_print_info('debug_window_height: '+str(debug_window_height))
     
 # Init Cycle time
 cycle_time_total = 0
@@ -966,13 +1003,13 @@ while True:
                 head_scan_max_step_tmp  = int(head_scan_max_tmp * head_logic_steps / 2)
                 head_scan_min_tmp       = 1.0 - HEAD_SCANNING_W_ANGLE
                 head_scan_min_step_tmp  = int(head_scan_min_tmp * head_logic_steps / 2)
-                #print("head_scan_step_tmp:      "+str(head_scan_step_tmp))
-                #print("head_scan_curr_tmp:      "+str(head_scan_curr_tmp))
-                #print("head_scan_max_tmp:       "+str(head_scan_max_tmp))
-                #print("head_scan_min_tmp:       "+str(head_scan_min_tmp))
-                #print("head_scan_curr_step_tmp: "+str(head_scan_curr_step_tmp))
-                #print("head_scan_max_step_tmp:  "+str(head_scan_max_step_tmp))
-                #print("head_scan_min_step_tmp:  "+str(head_scan_min_step_tmp))
+                #core_print_info("head_scan_step_tmp:      "+str(head_scan_step_tmp))
+                #core_print_info("head_scan_curr_tmp:      "+str(head_scan_curr_tmp))
+                #core_print_info("head_scan_max_tmp:       "+str(head_scan_max_tmp))
+                #core_print_info("head_scan_min_tmp:       "+str(head_scan_min_tmp))
+                #core_print_info("head_scan_curr_step_tmp: "+str(head_scan_curr_step_tmp))
+                #core_print_info("head_scan_max_step_tmp:  "+str(head_scan_max_step_tmp))
+                #core_print_info("head_scan_min_step_tmp:  "+str(head_scan_min_step_tmp))
                 if head_scan_curr_tmp >= head_scan_max_tmp:
                     head_write_int(-1*(head_scan_max_step_tmp-head_scan_min_step_tmp))
                 else:
@@ -1026,7 +1063,7 @@ while True:
             center_x = center_x-0.5
             center_x = int(center_x * head_logic_steps * HEAD_TRACKING_GAIN)
             if abs(center_x) >= int(head_logic_steps * HEAD_TRACKING_LIM_SENSE):
-                print("center_x: "+str(center_x))
+                head_print_info("center_x: "+str(center_x))
                 head_write_int(center_x)
     
     # Resize for debug window
@@ -1110,7 +1147,7 @@ while True:
     # Check if SCANNING should be entered
     if current_state == TRACKING:
         if sum(bad_frames_detected_arr) == len(bad_frames_detected_arr):
-            print('Go to scanning')
+            state_print_info('Go to scanning')
             current_state = SCANNING
             init_good_frames_detected()
             # Do detection on the first area next
@@ -1136,23 +1173,20 @@ while True:
             for good_frms_index in range(GOOD_FRAMES_DETECTED):
                 good_frms_sum = good_frms_sum + good_frames_detected_arr[i_tmp][good_frms_index] 
             if good_frms_sum == GOOD_FRAMES_DETECTED:
-                print('Go to tracking area: a'+str(i_tmp))
+                state_print_info('Go to tracking area: a'+str(i_tmp))
                 current_state = TRACKING
                 tracking_area = i_tmp
                 init_bad_frames_detected()
         
 #### End of loop ####
 
-# Close open log files
-if EN_HEAD_PRINT_LOG == 1:
-    global head_log_file 
-    head_log_file.close()
 
 
 
 #TODO:
 # - Make sure logging functions are working
-
+# - Set date on log -> Move/rename in the end
+# - There is two prints which can not be passed. Look at this.
 
 ## Init video recording
 #video_out = cv2.VideoWriter('output_video.avi',cv2.VideoWriter_fourcc(*'DIVX'), 5, debug_window_dim)
