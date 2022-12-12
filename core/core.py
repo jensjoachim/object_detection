@@ -32,7 +32,8 @@ import importlib.util
 import matplotlib.pyplot as plt
 import statistics
 import logging
-
+import datetime
+import shutil
 
 # Sensitivity for each detection
 #MIN_DECTETION_SCORE = 0.45
@@ -91,7 +92,9 @@ EN_HEAD_PRINT_TERMINAL  = 1
 
 # Setup logging
 log = "all.log"
-logging.basicConfig(filename=log,level=logging.DEBUG,format='%(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S')
+logging.basicConfig(filename=log,level=logging.DEBUG,format='%(asctime)s %(message)s',datefmt='%d/%m/%Y %H:%M:%S',filemode='w')
+log_start_date = datetime.datetime.now()
+log_start_date_str = "log__"+log_start_date.strftime("%d_%m_%Y__%H_%M_%S")
 
 
 def core_print_info(txt):
@@ -111,6 +114,7 @@ def core_print_info(txt):
     if EN_CORE_PRINT_TERMINAL == 1:
         print(txt_dump)
 core_print_info("Start of Core")
+core_print_info("Time: "+str(log_start_date))
 
 def state_print_info(txt):
     
@@ -771,6 +775,13 @@ def keyboard_command(wait_key_in):
         cap.release()
         cv2.destroyAllWindows()
         core_print_info('Exit print')
+        
+        # Try to make directory
+        try: 
+            os.mkdir('logs')
+        except OSError as error: 
+            do_nothing = 1  
+        shutil.copyfile('all.log','logs/'+log_start_date_str)
         return 0
     # If HEAD is connected
     if HEAD_EN == 1:
