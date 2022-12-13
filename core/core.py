@@ -74,6 +74,9 @@ HEAD_SCANNING_STEP = 0.04
 # Scanning width angle
 HEAD_SCANNING_W_ANGLE = 0.10
 
+# FPS on video recordings
+global REC_FPS
+REC_FPS = 5
 
 # Dumb core info in log
 EN_CORE_PRINT_LOG       = 1
@@ -89,6 +92,7 @@ EN_STATE_PRINT_TERMINAL = 1
 EN_HEAD_PRINT_LOG       = 1
 # Dumb head info in terminal
 EN_HEAD_PRINT_TERMINAL  = 1
+
 
 # Setup logging
 log = "all.log"
@@ -763,6 +767,52 @@ def take_time(en_print):
         core_print_info('cycle_time_total: '+str(cycle_time_total))
         core_print_info('cycle_time_avg:   '+str(cycle_time_avg))
 
+        
+# Functions - Recording
+
+global rec_start_date
+global rec_next_sec
+global rec_video
+
+
+print(time.time())
+
+
+def rec_start(image_np):
+    global REC_FPS
+    global rec_start_date
+    global rec_next_sec
+    global rec_video
+    rec_start_date = datetime.datetime.now()
+    rec_start_date_str = "vid__"+log_start_date.strftime("%d_%m_%Y__%H_%M_%S")+".avi"
+    rec_next_sec = time.time() + (1.0/REC_FPS)
+    rec_video = cv2.VideoWriter(rec_start_date_str,cv2.VideoWriter_fourcc(*'DIVX'), REC_FPS, debug_window_dim)
+    rec_add(image_np)
+
+def rec_add(image_np):
+    global rec_video
+    rec_video.write(image_np)
+
+def rec_add_frames(image_np):
+    global REC_FPS
+    global rec_video
+    global rec_next_sec
+    # Check if frame(s) should be added
+    rec_curr_sec = time.time()
+    add_n = 0
+    while rec_curr_sec >= rec_next_sec:
+        rec_next_sec = rec_next_sec + (1.0/REC_FPS)
+        rec_add(image_np)
+        add_n = add_n + 1
+
+def rec_stop(image_np):
+    global rec_video
+    rec_add_frames(image_np)
+    rec_video.release()
+
+
+    
+    
 
 # Functions - Keyboard Input
 
@@ -1171,6 +1221,11 @@ while True:
             control_state_sample_arr_y     = []
             control_state_mean_y           = -1
             control_state_var_y            = -1
+            # Stop Recording
+            rec_stop(image_np)
+        else:
+            # Recording
+            rec_add_frames(image_np)
                      
     # Increment counters
     detections_number = detections_number + 1
@@ -1188,6 +1243,8 @@ while True:
                 current_state = TRACKING
                 tracking_area = i_tmp
                 init_bad_frames_detected()
+                # Start recording
+                rec_start(image_np)
         
 #### End of loop ####
 
@@ -1195,9 +1252,7 @@ while True:
 
 
 #TODO:
-# - Make sure logging functions are working
-# - Set date on log -> Move/rename in the end
-# - There is two prints which can not be passed. Look at this.
+#
 
 ## Init video recording
 #video_out = cv2.VideoWriter('output_video.avi',cv2.VideoWriter_fourcc(*'DIVX'), 5, debug_window_dim)
