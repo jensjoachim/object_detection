@@ -779,14 +779,21 @@ print(time.time())
 
 
 def rec_start(image_np):
+    # Try to make directory
+    try: 
+        os.mkdir('vids')
+    except OSError as error: 
+        do_nothing = 1
+    # Start recording
     global REC_FPS
     global rec_start_date
     global rec_next_sec
     global rec_video
     rec_start_date = datetime.datetime.now()
-    rec_start_date_str = "vid__"+log_start_date.strftime("%d_%m_%Y__%H_%M_%S")+".avi"
+    rec_start_date_str = "vid__"+rec_start_date.strftime("%d_%m_%Y__%H_%M_%S")+".avi"
+    core_print_info("rec_start - "+rec_start_date_str)
     rec_next_sec = time.time() + (1.0/REC_FPS)
-    rec_video = cv2.VideoWriter(rec_start_date_str,cv2.VideoWriter_fourcc(*'DIVX'), REC_FPS, debug_window_dim)
+    rec_video = cv2.VideoWriter("vids/"+rec_start_date_str,cv2.VideoWriter_fourcc(*'DIVX'), REC_FPS, debug_window_dim)
     rec_add(image_np)
 
 def rec_add(image_np):
@@ -806,6 +813,7 @@ def rec_add_frames(image_np):
         add_n = add_n + 1
 
 def rec_stop(image_np):
+    core_print_info("rec_stop")
     global rec_video
     rec_add_frames(image_np)
     rec_video.release()
@@ -1253,13 +1261,10 @@ while True:
 
 #TODO:
 #
-
-## Init video recording
-#video_out = cv2.VideoWriter('output_video.avi',cv2.VideoWriter_fourcc(*'DIVX'), 5, debug_window_dim)
-## Video
-#video_out.write(image_np)
-##
-#video_out.release()
+# - Upload Video to G-Drive
+# - Sent an email when Tracking is enabled
+# - Try to make VNC functioning
+# - Live stream video
 
 
 
