@@ -17,3 +17,6 @@ https://github.com/sparkfun/SparkFun_ProDriver_TC78H670FTG_Arduino_Library/relea
 # Info how to set training parameters
 https://stackoverflow.com/questions/35050753/how-big-should-batch-size-and-number-of-epochs-be-when-fitting-a-model
 https://towardsdatascience.com/how-to-split-a-tensorflow-dataset-into-train-validation-and-test-sets-526c8dd29438
+
+# Info on how to connect G-Drive
+https://github.com/BugCode1/gdrive/releases/tag/2.1.2
