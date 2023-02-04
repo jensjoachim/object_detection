@@ -38,7 +38,8 @@ import subprocess
 
 # Sensitivity for each detection
 #MIN_DECTETION_SCORE = 0.45
-MIN_DECTETION_SCORE = 0.50
+#MIN_DECTETION_SCORE = 0.50
+MIN_DECTETION_SCORE = 0.55
 
 # Remove detection if they are on bounday. 
 # It seems to be a good idea, since many faulty detections is occuring.
@@ -77,16 +78,27 @@ HEAD_SCANNING_W_ANGLE = 0.10
 
 # FPS on video recordings
 global REC_ENABLE
-global REC_FPS
 REC_ENABLE = True
+# Set FPS of video, it will either add duplicate frames or skip frames
+global REC_FPS
 REC_FPS = 5
+# Set maximum time in secs of how long one recording may be.
+global REC_MAX_LENGTH
+REC_MAX_LENGTH = 300
+# Max disk space to be used in percent (%) and file system. (Check this will the command "df")
+global REC_DISK_MAX
+global REC_DISK_FILE_SYSTEM
+REC_DISK_MAX = 80
+REC_DISK_FILE_SYSTEM = "/dev/root"
 
-# Google drive access
+# Google drive upload of recordings
 global GDRIVE_ENABLE
-global GDRIVE_FOLDER
-global GDRIVE_UPLOAD_BG
 GDRIVE_ENABLE = True
+# Drive folder ID
+global GDRIVE_FOLDER
 GDRIVE_FOLDER = "1IpLZLyaaUw_pGjlu93I0cdmRMKihk0j6"
+# Upload in background
+global GDRIVE_UPLOAD_BG
 GDRIVE_UPLOAD_BG = True
 
 # Dumb core info in log
@@ -785,10 +797,46 @@ global rec_start_date
 global rec_next_sec
 global rec_video
 global rec_start_date_str
+global rec_next_max
+global rec_running
+rec_running = False
+
+def rec_disk_space_ok():
+    global REC_DISK_MAX
+    global REC_DISK_FILE_SYSTEM
+    return_message = subprocess.check_output("df".split()).decode("utf-8")
+    list0 = [ele for ele in return_message.split("\n")[0].split(" ") if ele != ""]
+    list1 = [ele for ele in return_message.split("\n")[1].split(" ") if ele != ""]
+    #print(list0)
+    #print(list1)
+    # Check size is OK
+    if len(list0) != 7 or len(list1) != 6:
+        core_print_info("rec_disk_space_ok: List size failed: "+str(len(list0))+", "+str(len(list1)))
+        return False
+    if list0[0] != "Filesystem":
+        core_print_info("rec_disk_space_ok: Failed vs. Filesystem")
+        return False
+    if list0[4] != "Use%":
+        core_print_info("rec_disk_space_ok: Failed vs. Use%")
+        return False
+    if list1[0] != REC_DISK_FILE_SYSTEM:
+        core_print_info("rec_disk_space_ok: Failed vs. "+REC_DISK_FILE_SYSTEM)
+        return False
+    percent_int = int(list1[4].split("%")[0])
+    #print("rec_disk_space_ok: Percent: "+str(percent_int))
+    if percent_int >= REC_DISK_MAX:
+        core_print_info("rec_disk_space_ok: Failed percent: "+str(percent_int)+" >= "+str(REC_DISK_MAX))
+        return False
+    # All good
+    return True
 
 def rec_start(image_np):
     global REC_ENABLE
     if REC_ENABLE:
+        # Check disk space
+        if not rec_disk_space_ok():
+            core_print_info("rec_start: Failed! No disk space")
+            return
         # Try to make directory
         try: 
             os.mkdir('vids')
@@ -800,60 +848,78 @@ def rec_start(image_np):
         global rec_next_sec
         global rec_video
         global rec_start_date_str
+        global rec_next_max        
+        global rec_running
+        global REC_MAX_LENGTH
+        rec_running = True
         rec_start_date = datetime.datetime.now()
         rec_start_date_str = "vid__"+rec_start_date.strftime("%d_%m_%Y__%H_%M_%S")+".avi"
         core_print_info("rec_start - "+rec_start_date_str)
         rec_next_sec = time.time() + (1.0/REC_FPS)
+        rec_next_max = time.time() + float(REC_MAX_LENGTH)
         rec_video = cv2.VideoWriter("vids/"+rec_start_date_str,cv2.VideoWriter_fourcc(*'DIVX'), REC_FPS, debug_window_dim)
         rec_add(image_np)
 
+def rec_upload_google():
+    # Upload to G-Drive
+    if GDRIVE_ENABLE:
+        global rec_start_date_str
+        global GDRIVE_UPLOAD_BG
+        if GDRIVE_UPLOAD_BG == False:
+            gdrive_cmd = "drive upload vids/"+rec_start_date_str+" -p "+GDRIVE_FOLDER
+            return_message = -1
+            try:
+                return_message = subprocess.check_output(gdrive_cmd.split()).decode("utf-8")
+            except subprocess.CalledProcessError as err:
+                core_print_info(err)
+            if return_message != -1:
+                for line in return_message.split('\n'):
+                    if line != "":
+                        core_print_info(line)
+        else:
+            gdrive_cmd = "drive upload vids/"+rec_start_date_str+" -p "+GDRIVE_FOLDER+" >> upload.log &"
+            core_print_info("rec_upload_google: Executing in BG: "+gdrive_cmd)
+            os.system(gdrive_cmd)
+
 def rec_add(image_np):
     global REC_ENABLE
-    if REC_ENABLE:
+    global rec_running
+    if REC_ENABLE and rec_running:
         rec_video.write(image_np)
 
 def rec_add_frames(image_np):
     global REC_ENABLE
-    if REC_ENABLE:
+    global rec_running
+    if REC_ENABLE and rec_running:
         global REC_FPS
         global rec_video
         global rec_next_sec
+        global rec_next_max 
         # Check if frame(s) should be added
         rec_curr_sec = time.time()
         add_n = 0
         while rec_curr_sec >= rec_next_sec:
             rec_next_sec = rec_next_sec + (1.0/REC_FPS)
+            #core_print_info("rec_next_sec: "+str(rec_next_sec))
             rec_add(image_np)
             add_n = add_n + 1
+        # Check if Max time reached
+        if rec_next_sec >= rec_next_max:
+            core_print_info("rec_add_frames: Max time reached")
+            rec_stop()
+            rec_start(image_np)
 
-def rec_stop(image_np):
+def rec_stop():
     global REC_ENABLE
-    if REC_ENABLE:
+    global rec_running
+    if REC_ENABLE and rec_running:
         core_print_info("rec_stop")
         global rec_video
-        rec_add_frames(image_np)
         rec_video.release()
-        # Upload to G-Drive
-        if GDRIVE_ENABLE:
-            global rec_start_date_str
-            global GDRIVE_UPLOAD_BG
-            if GDRIVE_UPLOAD_BG == False:
-                gdrive_cmd = "drive upload vids/"+rec_start_date_str+" -p "+GDRIVE_FOLDER
-                return_message = -1
-                try:
-                    return_message = subprocess.check_output(gdrive_cmd.split()).decode("utf-8")
-                except subprocess.CalledProcessError as err:
-                    core_print_info(err)
-                if return_message != -1:
-                    for line in return_message.split('\n'):
-                        if line != "":
-                            core_print_info(line)
-            else:
-                gdrive_cmd = "drive upload vids/"+rec_start_date_str+" -p "+GDRIVE_FOLDER+" >> upload.log &"
-                core_print_info("Executing in BG: "+gdrive_cmd)
-                os.system(gdrive_cmd)
+        rec_upload_google()
+        rec_running = False
                 
-def rec_check_uploaded():
+def rec_check_uploaded_google():
     if GDRIVE_UPLOAD_BG:        
         file_exists = os.path.exists("upload.log")
         if file_exists:
@@ -874,7 +940,7 @@ def rec_check_uploaded():
                     if line != "":
                         for line2 in line.split('\n'):
                             if line2 != "":
-                                core_print_info(line2)
+                                core_print_info("rec_upload_google: "+line2)
                 # Remove log
                 os.remove("upload.log")
     
@@ -1287,7 +1353,8 @@ while True:
             control_state_mean_y           = -1
             control_state_var_y            = -1
             # Stop Recording
-            rec_stop(image_np)
+            rec_add_frames(image_np)
+            rec_stop()
         else:
             # Recording
             rec_add_frames(image_np)
@@ -1312,7 +1379,7 @@ while True:
                 rec_start(image_np)
 
     # Check if upload of video is done
-    rec_check_uploaded()
+    rec_check_uploaded_google()
 
     
 #### End of loop ####
@@ -1321,7 +1388,6 @@ while True:
 
 
 #TODO:
-# - Set max rec time and MAX space on HD with recpect to recording
 # - Sent an email when Tracking is enabled
 # - Set different rotate configurations for HEAD
 # - Try to make VNC functioning or SSH
