@@ -20,3 +20,10 @@ https://towardsdatascience.com/how-to-split-a-tensorflow-dataset-into-train-vali
 
 # Info on how to connect G-Drive
 https://github.com/BugCode1/gdrive/releases/tag/2.1.2
+
+# Info on how to connect G-Mail
+https://learnubuntu.com/send-emails-from-server/
+
+# Tips and Tricks
+# Sort log on the fly: tail -f all.log | sed /Head:/,+0d
+ 

@@ -101,6 +101,22 @@ GDRIVE_FOLDER = "1IpLZLyaaUw_pGjlu93I0cdmRMKihk0j6"
 global GDRIVE_UPLOAD_BG
 GDRIVE_UPLOAD_BG = True
 
+# Google email notifications
+global GMAIL_ENABLE
+GMAIL_ENABLE = True
+# gmail from
+global GMAIL_FROM
+GMAIL_FROM = "Object Detection"
+# Recipent email
+global GMAIL_TO
+GMAIL_TO = "krogsloekke@gmail.com"
+# Notify tracking state entered
+global GMAIL_TRACKING_ENTERED
+GMAIL_TRACKING_ENTERED = True
+# Notify uploaded to GDRIVE
+global GMAIL_UPLOAD_DONE
+GMAIL_UPLOAD_DONE = True    
+
 # Dumb core info in log
 EN_CORE_PRINT_LOG       = 1
 # Dumb state info in terminal
@@ -761,6 +777,30 @@ def head_print_info(txt):
     if EN_HEAD_PRINT_TERMINAL == 1:
         print(txt_dump)
 
+        
+# Functions - G-Mail
+
+def gmail_notify_tracking_entered(label):
+    if GMAIL_ENABLE and GMAIL_TRACKING_ENTERED:
+        gmail_send(GMAIL_FROM+" - Tracking - "+str(label))
+def gmail_notify_upload_done(label):
+    if GMAIL_ENABLE and GMAIL_UPLOAD_DONE:
+        gmail_send(GMAIL_FROM+" - Upoad done - "+str(label))
+def gmail_send(txt):
+    if GMAIL_ENABLE:
+        global GMAIL_FROM
+        global GMAIL_TO
+        core_print_info("gmail_send: "+txt)
+        # Make email file
+        f = open("email.txt", 'w')
+        f.write("From: "+GMAIL_FROM+"\n")
+        f.write("Subject: "+txt+"\n")
+        f.close()
+        # Send email
+        os.system("ssmtp "+GMAIL_TO+" < email.txt &")
+        # Remove email file
+        os.remove("email.txt")
+        
 
 # Functions - Time Measurement
 
@@ -865,6 +905,7 @@ def rec_upload_google():
     if GDRIVE_ENABLE:
         global rec_start_date_str
         global GDRIVE_UPLOAD_BG
+        gmail_notify_upload_done(rec_start_date_str)
         if GDRIVE_UPLOAD_BG == False:
             gdrive_cmd = "drive upload vids/"+rec_start_date_str+" -p "+GDRIVE_FOLDER
             return_message = -1
@@ -1372,6 +1413,8 @@ while True:
                 good_frms_sum = good_frms_sum + good_frames_detected_arr[i_tmp][good_frms_index] 
             if good_frms_sum == GOOD_FRAMES_DETECTED:
                 state_print_info('Go to tracking area: a'+str(i_tmp))
+                class_name_tmp = category_index[detection_list_tmp[i_tmp]['detection_classes'][j_tmp]]['name']
+                gmail_notify_tracking_entered(class_name_tmp)   
                 current_state = TRACKING
                 tracking_area = i_tmp
                 init_bad_frames_detected()
