@@ -1234,6 +1234,7 @@ while True:
 
     # Insert delay before scanning again
     if current_state == IDLE:
+        time.sleep(0.1)
         # Enter scanning if duration is over
         if idle_time_start > IDLE_TIME_DUR:
             state_print_info('Go to scanning')
