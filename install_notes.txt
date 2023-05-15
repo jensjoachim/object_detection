@@ -1,3 +1,6 @@
+# My model:
+18_08_2022_efficientdet-lite1_e75_b32_s2000
+
 # Objecte detection Coral Edge TPU installation
 https://github.com/EdjeElectronics/TensorFlow-Lite-Object-Detection-on-Android-and-Raspberry-Pi/
 

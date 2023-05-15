@@ -75,6 +75,8 @@ HEAD_TRACKING_LIM_SENSE = 0.001
 HEAD_SCANNING_STEP = 0.04
 # Scanning width angle
 HEAD_SCANNING_W_ANGLE = 0.10
+# Idle Time duration
+IDLE_TIME_DUR = 1000*10
 
 # FPS on video recordings
 global REC_ENABLE
@@ -1004,18 +1006,25 @@ def keyboard_command(wait_key_in):
         except OSError as error: 
             do_nothing = 1  
         shutil.copyfile('all.log','logs/'+log_start_date_str)
-        return 0
+        return 0    
+    # Control States
+    global IDLE_EN
+    if wait_key_in == ord('1'):
+        if IDLE_EN == 1:
+            IDLE_EN = 0
+        else:
+            IDLE_EN = 1
     # If HEAD is connected
     if HEAD_EN == 1:
         # Stop/Start wrinting head
         global head_write_scanning_en
-        if wait_key_in == ord('1'):
+        if wait_key_in == ord('2'):
             if head_write_scanning_en == 1:
                 head_write_scanning_en = 0
             else:
                 head_write_scanning_en = 1
         global head_write_tracking_en
-        if wait_key_in == ord('2'):
+        if wait_key_in == ord('3'):
             if head_write_tracking_en == 1:
                 head_write_tracking_en = 0
             else:
@@ -1079,19 +1088,23 @@ global good_frames_detected_arr
 BAD_FRAMES_DETECTED = 10
 global bad_frames_detected_arr
 
-
+global IDLE
+global IDLE_EN
 global SCANNING
 global TRACKING
 global SCANNING_EN
 global TRACKING_EN
 global current_state
 global tracking_area
-SCANNING = 0
-TRACKING = 1
+IDLE     = 1
+SCANNING = 2
+TRACKING = 3
+IDLE_EN     = 1
 SCANNING_EN = 1
 TRACKING_EN = 1
 current_state = SCANNING
 tracking_area = 0
+idle_time_start = 0
 
 def init_good_frames_detected():
     global good_frames_detected_arr
@@ -1218,13 +1231,26 @@ while True:
     
     # Take time
     take_time(0)
-    
+
+    # Insert delay before scanning again
+    if current_state == IDLE:
+        # Enter scanning if duration is over
+        if idle_time_start > IDLE_TIME_DUR:
+            state_print_info('Go to scanning')
+            current_state = SCANNING
+        # Enter Scanning if triggered vai keyboard
+        if not IDLE_EN:
+            state_print_info('Go to scanning')
+            current_state = SCANNING
+        # Update timer
+        idle_time_start = cycle_time_total + idle_time_start
+            
     # Service HEAD
     if HEAD_EN == 1:
         # Read status
         head_read_all()
         # Rotate head if SCANNING
-        if current_state == SCANNING:
+        if current_state == SCANNING and SCANNING_EN:
             # Make "n" fill scans before rotating head
             # (n=GOOD_FRAMES_DETECTED)
             frame_index_tmp = detections_number % (len(DET_AREA_COORD) * (GOOD_FRAMES_DETECTED+1))
@@ -1245,6 +1271,11 @@ while True:
                 #core_print_info("head_scan_min_step_tmp:  "+str(head_scan_min_step_tmp))
                 if head_scan_curr_tmp >= head_scan_max_tmp:
                     head_write_int(-1*(head_scan_max_step_tmp-head_scan_min_step_tmp))
+                    if IDLE_EN:
+                        # Goto IDLE STAGE  here!
+                        state_print_info("Go to idle: "+str(int(IDLE_TIME_DUR/1000))+"s")
+                        current_state = IDLE
+                        idle_time_start = 0
                 else:
                     head_write_int(head_scan_step_tmp)
 
@@ -1256,15 +1287,17 @@ while True:
     # Get frame
     ret, frame = cap.read()
     image_np = np.array(frame)
-
+        
     # Crop input image
-    area_coord = DET_AREA_COORD[detections_index]
-    image_np_copy = image_np.copy()
-    image_np_crop = image_np_copy[area_coord[4]:area_coord[5],area_coord[2]:area_coord[3]]
+    if current_state == TRACKING or current_state == SCANNING:
+        area_coord = DET_AREA_COORD[detections_index]
+        image_np_copy = image_np.copy()
+        image_np_crop = image_np_copy[area_coord[4]:area_coord[5],area_coord[2]:area_coord[3]]
 
     # Only run one detection per frame
-    area = DETECTION_AREA[detections_index]
-    detections_list[detections_index], num_of_det = run_detector_area(image_np_crop, area)
+    if current_state == TRACKING or current_state == SCANNING:
+        area = DETECTION_AREA[detections_index]
+        detections_list[detections_index], num_of_det = run_detector_area(image_np_crop, area)
     
     # Make new single entry detections list for tracking
     if current_state == TRACKING and TRACKING_EN:
@@ -1284,7 +1317,8 @@ while True:
             good_frames_detected_arr[detections_index].append(0)
     
     # Find strongest detection
-    found_max, max_score, i_tmp, j_tmp = find_strongest_detection(detection_list_tmp, 0)
+    if current_state == TRACKING or current_state == SCANNING:
+        found_max, max_score, i_tmp, j_tmp = find_strongest_detection(detection_list_tmp, 0)
     
     # Send rotation to head
     if found_max and max_score >= MIN_DECTETION_SCORE and current_state == TRACKING:
@@ -1304,7 +1338,7 @@ while True:
 
     # Draw all detections areas 
     if DRAW_ALL_DET_AREA:
-        if current_state == SCANNING and SCANNING_EN:
+        if current_state == SCANNING and SCANNING_EN or current_state == IDLE:
             draw_detection_areas(DET_AREA_COORD, 0, image_np)
         if current_state == TRACKING and TRACKING_EN:
             DET_AREA_COORD_TMP = []
@@ -1313,11 +1347,13 @@ while True:
         
     # Draw all detections 
     if DRAW_ALL_DET:
-        draw_detections_list(detection_list_tmp, detections_index_start, image_np) 
+        if current_state == TRACKING or current_state == SCANNING:
+            draw_detections_list(detection_list_tmp, detections_index_start, image_np) 
     
     # Draw strongest detection  
     if found_max and DRAW_STRONGEST_DET:
-        draw_strongest_detection(detection_list_tmp, max_score, i_tmp, j_tmp, image_np, '#0000ff', detections_index_start)
+        if current_state == TRACKING or current_state == SCANNING:
+            draw_strongest_detection(detection_list_tmp, max_score, i_tmp, j_tmp, image_np, '#0000ff', detections_index_start)
     
     # Count bad frames in TRACKING
     if current_state == TRACKING:
@@ -1401,25 +1437,26 @@ while True:
             rec_add_frames(image_np)
                      
     # Increment counters
-    detections_number = detections_number + 1
-    detections_index  = detections_index + 1
-    if len(DET_AREA_COORD) == detections_index:
-        detections_index = 0
+    if current_state == TRACKING or current_state == SCANNING:
+        detections_number = detections_number + 1
+        detections_index  = detections_index + 1
+        if len(DET_AREA_COORD) == detections_index:
+            detections_index = 0
         
-        # Check that strongest score also has privious detections in same detection area
-        if max_score >= MIN_DECTETION_SCORE and current_state != TRACKING and TRACKING_EN:
-            good_frms_sum = 0
-            for good_frms_index in range(GOOD_FRAMES_DETECTED):
-                good_frms_sum = good_frms_sum + good_frames_detected_arr[i_tmp][good_frms_index] 
-            if good_frms_sum == GOOD_FRAMES_DETECTED:
-                state_print_info('Go to tracking area: a'+str(i_tmp))
-                class_name_tmp = category_index[detection_list_tmp[i_tmp]['detection_classes'][j_tmp]]['name']
-                gmail_notify_tracking_entered(class_name_tmp)   
-                current_state = TRACKING
-                tracking_area = i_tmp
-                init_bad_frames_detected()
-                # Start recording
-                rec_start(image_np)
+            # Check that strongest score also has privious detections in same detection area
+            if max_score >= MIN_DECTETION_SCORE and current_state != TRACKING and TRACKING_EN:
+                good_frms_sum = 0
+                for good_frms_index in range(GOOD_FRAMES_DETECTED):
+                    good_frms_sum = good_frms_sum + good_frames_detected_arr[i_tmp][good_frms_index] 
+                if good_frms_sum == GOOD_FRAMES_DETECTED:
+                    state_print_info('Go to tracking area: a'+str(i_tmp))
+                    class_name_tmp = category_index[detection_list_tmp[i_tmp]['detection_classes'][j_tmp]]['name']
+                    gmail_notify_tracking_entered(class_name_tmp)   
+                    current_state = TRACKING
+                    tracking_area = i_tmp
+                    init_bad_frames_detected()
+                    # Start recording
+                    rec_start(image_np)
 
     # Check if upload of video is done
     rec_check_uploaded_google()
@@ -1431,8 +1468,7 @@ while True:
 
 
 #TODO:
-# - Sent an email when Tracking is enabled
-# - Set different rotate configurations for HEAD
+# - Set different rotate configurations for HEAD -> Load a file with configurations
 # - Try to make VNC functioning or SSH
 # - Live stream video
 
