@@ -50,12 +50,15 @@ BOUNDARY_DETECTIONS_ON = True
 BOUNDARY_SENSITIVITY_SCANNING = 0.1
 
 # Draw all detection areas
+global DRAW_ALL_DET_AREA
 DRAW_ALL_DET_AREA = True
 
 # Draw All detections with respect to MIN_DETECTION_SCORE
+global DRAW_ALL_DET
 DRAW_ALL_DET = True
 
 # Draw strongest detection if more than MIN_DETECTION_SCORE
+global DRAW_STRONGEST_DET
 DRAW_STRONGEST_DET = True
 
 # Draw status
@@ -476,6 +479,8 @@ def draw_detection_areas(area_coord_list, start_index, img):
             
     return img
 
+global show_conf
+show_conf = 0;
 def draw_general_status(img):
    
     # Cycle Time
@@ -508,15 +513,56 @@ def draw_general_status(img):
     str_mean_x = 'Mean X: {0:.3f}'.format(control_state_mean_x)
     str_var_x  = 'Var X: {0:.6f}'.format(control_state_var_x)
     
-    # Concat all strings
-    lines = [
-        str_cycle_time_total,
-        str_cycle_time_avg,
-        str_head_angle,
-        str_head_distance,
-        str_mean_x,
-        str_var_x]
-    
+
+    global show_conf
+    # Current statistic
+    if show_conf == 0:
+        lines = [
+            str_cycle_time_total,
+            str_cycle_time_avg,
+            str_head_angle,
+            str_head_distance,
+            str_mean_x,
+            str_var_x]
+    # Current screen view
+    elif show_conf == 1:
+        global IDLE_EN
+        lines = []
+        if IDLE_EN == 1:
+            lines.append("[ ] 1: Disable Idle State")
+        else:
+            lines.append("[x] 1: Disable Idle State")
+        if head_write_scanning_en == 1:
+            lines.append("[ ] 2: Stop Head Scanning")
+        else:
+            lines.append("[x] 2: Stop Head Scanning")
+        if head_write_tracking_en == 1:
+            lines.append("[ ] 3: Stop Head Tracking")
+        else:
+            lines.append("[x] 3: Stop Head Tracking")
+        if DRAW_ALL_DET_AREA == True:
+            lines.append("[x] 4: Draw all areas")
+        else:
+            lines.append("[ ] 4: Draw all areas")
+        if DRAW_ALL_DET == True:
+            lines.append("[x] 5: Draw all detections")
+        else:
+            lines.append("[ ] 5: Draw all detections")            
+        if DRAW_STRONGEST_DET == True:
+            lines.append("[x] 6: Draw strongest detection")
+        else:
+            lines.append("[ ] 6: Draw strongest detection")
+        lines.append("    a: Rotate left")
+        lines.append("    d: Rotate right")
+        lines.append("    r: Re-center")
+    # Debug
+    elif show_conf == 2:
+        lines = ["line01","line02","line03","line04","line05","line06",
+                 "line07","line08","line09","line10","line11","line12"]
+    # Nothing
+    else:
+        lines = [" "," "]
+
     # Generate text locations
     text_locations = []
     font_size = 2.5
@@ -994,6 +1040,7 @@ def keyboard_command(wait_key_in):
     global cap
     global HEAD_EN
     global head_logic_steps
+    global show_conf
     # Stop
     if wait_key_in == ord('q'):
         cap.release()
@@ -1029,6 +1076,25 @@ def keyboard_command(wait_key_in):
                 head_write_tracking_en = 0
             else:
                 head_write_tracking_en = 1
+        # Enable status
+        global DRAW_ALL_DET_AREA
+        if wait_key_in == ord('4'):
+            if DRAW_ALL_DET_AREA == True:
+                DRAW_ALL_DET_AREA = False
+            else:
+                DRAW_ALL_DET_AREA = True
+        global DRAW_ALL_DET
+        if wait_key_in == ord('5'):
+            if DRAW_ALL_DET == True:
+                DRAW_ALL_DET = False
+            else:
+                DRAW_ALL_DET = True
+        global DRAW_STRONGEST_DET
+        if wait_key_in == ord('6'):
+            if DRAW_STRONGEST_DET == True:
+                DRAW_STRONGEST_DET = False
+            else:
+                DRAW_STRONGEST_DET = True
         # Re-center degreess to 180 degreess
         if wait_key_in == ord('r'):
             head_write('re-center')
@@ -1038,6 +1104,9 @@ def keyboard_command(wait_key_in):
         # Rotate Left
         if wait_key_in == ord('d'):
             head_write_int(-1*int(head_logic_steps/32))
+    # Info on screen
+    if wait_key_in == ord('i'):
+        show_conf = (show_conf + 1) % 4
             
     return 1
 
