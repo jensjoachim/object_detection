@@ -37,6 +37,7 @@ import shutil
 import subprocess
 
 # Sensitivity for each detection
+global MIN_DECTETION_SCORE
 #MIN_DECTETION_SCORE = 0.45
 #MIN_DECTETION_SCORE = 0.50
 MIN_DECTETION_SCORE = 0.55
@@ -44,9 +45,12 @@ MIN_DECTETION_SCORE = 0.55
 # Remove detection if they are on bounday. 
 # It seems to be a good idea, since many faulty detections is occuring.
 # Also the tracking will lock onto the window, so its best to be enabled.
+global BOUNDARY_SENSITIVITY
+global BOUNDARY_DETECTIONS_ON
 BOUNDARY_SENSITIVITY = 0.01
 BOUNDARY_DETECTIONS_ON = True
 # It's good to have another sensitivity before entering tracking
+global BOUNDARY_SENSITIVITY_SCANNING
 BOUNDARY_SENSITIVITY_SCANNING = 0.1
 
 # Draw all detection areas
@@ -62,6 +66,7 @@ global DRAW_STRONGEST_DET
 DRAW_STRONGEST_DET = True
 
 # Draw status
+global DRAW_STATUS
 DRAW_STATUS = True
 
 # Max detections to be processed per detector
@@ -69,16 +74,21 @@ global DET_MAX_PROC
 DET_MAX_PROC = 7
 
 # Head configuration: Set gain level per dectertion center offset
+global HEAD_TRACKING_GAIN
 HEAD_TRACKING_GAIN = 1.0/14
 # Head configuration: Set when when not to move head anymore when target is in center
 # (Set in radians)
+global HEAD_TRACKING_LIM_SENSE
 HEAD_TRACKING_LIM_SENSE = 0.001
 # Scanning step radians
+global HEAD_SCANNING_STEP
 #HEAD_SCANNING_STEP = 0.02
 HEAD_SCANNING_STEP = 0.04
 # Scanning width angle
+global HEAD_SCANNING_W_ANGLE
 HEAD_SCANNING_W_ANGLE = 0.10
 # Idle Time duration
+global IDLE_TIME_DUR
 IDLE_TIME_DUR = 1000*10
 
 # FPS on video recordings
@@ -163,6 +173,35 @@ def core_print_info(txt):
         print(txt_dump)
 core_print_info("Start of Core")
 core_print_info("Time: "+str(log_start_date))
+
+core_print_info("Configuration:")
+core_print_info("MIN_DECTETION_SCORE:           "+str(MIN_DECTETION_SCORE))
+core_print_info("BOUNDARY_SENSITIVITY:          "+str(BOUNDARY_SENSITIVITY))
+core_print_info("BOUNDARY_DETECTIONS_ON:        "+str(BOUNDARY_DETECTIONS_ON))
+core_print_info("BOUNDARY_SENSITIVITY_SCANNING: "+str(BOUNDARY_SENSITIVITY_SCANNING))
+core_print_info("DRAW_ALL_DET_AREA:             "+str(DRAW_ALL_DET_AREA))
+core_print_info("DRAW_ALL_DET:                  "+str(DRAW_ALL_DET))
+core_print_info("DRAW_STRONGEST_DET:            "+str(DRAW_STRONGEST_DET))
+core_print_info("DRAW_STATUS:                   "+str(DRAW_STATUS))
+core_print_info("DET_MAX_PROC:                  "+str(DET_MAX_PROC))
+core_print_info("HEAD_TRACKING_GAIN:            "+str(HEAD_TRACKING_GAIN))
+core_print_info("HEAD_TRACKING_LIM_SENSE:       "+str(HEAD_TRACKING_LIM_SENSE))
+core_print_info("HEAD_SCANNING_STEP:            "+str(HEAD_SCANNING_STEP))
+core_print_info("HEAD_SCANNING_W_ANGLE:         "+str(HEAD_SCANNING_W_ANGLE))
+core_print_info("IDLE_TIME_DUR:                 "+str(IDLE_TIME_DUR))
+core_print_info("REC_ENABLE:                    "+str(REC_ENABLE))
+core_print_info("REC_FPS:                       "+str(REC_FPS))
+core_print_info("REC_MAX_LENGTH:                "+str(REC_MAX_LENGTH))
+core_print_info("REC_DISK_MAX:                  "+str(REC_DISK_MAX))
+core_print_info("REC_DISK_FILE_SYSTEM:          "+str(REC_DISK_FILE_SYSTEM))
+core_print_info("GDRIVE_ENABLE:                 "+str(GDRIVE_ENABLE))
+core_print_info("GDRIVE_FOLDER:                 "+str(GDRIVE_FOLDER))
+core_print_info("GDRIVE_UPLOAD_BG:              "+str(GDRIVE_UPLOAD_BG))
+core_print_info("GMAIL_ENABLE:                  "+str(GMAIL_ENABLE))
+core_print_info("GMAIL_FROM:                    "+str(GMAIL_FROM))
+core_print_info("GMAIL_TO:                      "+str(GMAIL_TO))
+core_print_info("GMAIL_TRACKING_ENTERED:        "+str(GMAIL_TRACKING_ENTERED))
+core_print_info("GMAIL_UPLOAD_DONE:             "+str(GMAIL_UPLOAD_DONE))
 
 def state_print_info(txt):
     
