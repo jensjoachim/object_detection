@@ -90,6 +90,13 @@ HEAD_SCANNING_W_ANGLE = 0.10
 # Idle Time duration
 global IDLE_TIME_DUR
 IDLE_TIME_DUR = 1000*10
+# States to be enabled
+global IDLE_EN
+global SCANNING_EN
+global TRACKING_EN
+IDLE_EN     = 1
+SCANNING_EN = 1
+TRACKING_EN = 1
 
 # FPS on video recordings
 global REC_ENABLE
@@ -130,7 +137,7 @@ global GMAIL_TRACKING_ENTERED
 GMAIL_TRACKING_ENTERED = True
 # Notify uploaded to GDRIVE
 global GMAIL_UPLOAD_DONE
-GMAIL_UPLOAD_DONE = True    
+GMAIL_UPLOAD_DONE = True
 
 # Dumb core info in log
 EN_CORE_PRINT_LOG       = 1
@@ -174,6 +181,27 @@ def core_print_info(txt):
 core_print_info("Start of Core")
 core_print_info("Time: "+str(log_start_date))
 
+# Load Configurations
+if len(sys.argv) == 2:
+    core_print_info("Loading configuration from file: "+str(sys.argv[1]))
+    with open(str(sys.argv[1]),'r') as f:
+        for line in f:
+            line = line.split("\n")[0]
+            if line.split(" ")[1] == "True":
+                globals()[line.split(" ")[0]] = True
+                conf_type = "Boolean"
+            elif line.split(" ")[1] == "False":
+                globals()[line.split(" ")[0]] = False
+                conf_type = "Boolean"
+            elif '.' in line.split(" ")[1]:
+                globals()[line.split(" ")[0]] = float(line.split(" ")[1])
+                conf_type = "Float"
+            else:
+                globals()[line.split(" ")[0]] = int(line.split(" ")[1])
+                conf_type = "Int"
+            core_print_info(line.split(" ")[0]+": "+line.split(" ")[1]+" ("+conf_type+")")
+
+# Print Configurations
 core_print_info("Configuration:")
 core_print_info("MIN_DECTETION_SCORE:           "+str(MIN_DECTETION_SCORE))
 core_print_info("BOUNDARY_SENSITIVITY:          "+str(BOUNDARY_SENSITIVITY))
@@ -1197,19 +1225,15 @@ BAD_FRAMES_DETECTED = 10
 global bad_frames_detected_arr
 
 global IDLE
-global IDLE_EN
 global SCANNING
 global TRACKING
-global SCANNING_EN
-global TRACKING_EN
-global current_state
-global tracking_area
 IDLE     = 1
 SCANNING = 2
 TRACKING = 3
-IDLE_EN     = 1
-SCANNING_EN = 1
-TRACKING_EN = 1
+global current_state
+global tracking_area
+
+
 current_state = SCANNING
 tracking_area = 0
 idle_time_start = 0
@@ -1577,7 +1601,6 @@ while True:
 
 
 #TODO:
-# - Set different rotate configurations for HEAD -> Load a file with configurations
 # - Try to make VNC functioning or SSH
 # - Live stream video
 
