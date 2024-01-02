@@ -39,10 +39,13 @@ const int VERSION_SCRIPT = 1;
 uint8_t DBG_LEVEL = 3;
 
 // Define LIDAR
+//#define EN_LIDAR
+#ifdef EN_LIDAR
 LIDARLite_v4LED myLidarLite;
 #define FAST_I2C
 #define MonitorPin    12
 #define TriggerPin    13
+#endif
 
 // Stepper Configuration
 const unsigned int STEP_SELECT = 7;
@@ -80,12 +83,14 @@ void setup() {
   #endif
 
   // Configure LIDAR
+  #ifdef EN_LIDAR
   digitalWrite(SCL, LOW);
   digitalWrite(SDA, LOW);
   pinMode(MonitorPin, INPUT);
   pinMode(TriggerPin, OUTPUT);
   digitalWrite(TriggerPin, LOW);
   myLidarLite.configure(0); // Mode
+  #endif
 
   // ----------------------------------------------------------------------
   // ** One method of increasing the measurement speed of the
@@ -99,8 +104,10 @@ void setup() {
   //uint8_t dataByte = 0x00;
   //uint8_t dataByte = 0x15;
   //uint8_t dataByte = 0x3F;
+  #ifdef EN_LIDAR
   uint8_t dataByte = 0xFF;
   myLidarLite.write(0xEB, &dataByte, 1, 0x62); // Turn off high accuracy mode
+  #endif
 
   // Print Version
   Serial.print("Camera Stepper Version v");
@@ -156,7 +163,7 @@ uint16_t * distance;
 int measurement_ongoing = 0;
 
 void loop() {
-
+  
   // Read Serial
   if (Serial.available()) {
     // Read string
@@ -190,6 +197,7 @@ void loop() {
     }
   } 
 
+  #ifdef EN_LIDAR
   // Handle distance measument
   if (measurement_ongoing == 0) {
     // Trigger measurement
@@ -209,13 +217,16 @@ void loop() {
       measurement_ongoing = 0;
     }
   }
+  #endif
   
 }
 
+#ifdef EN_LIDAR
 void getDist(uint16_t * distance)
 {
   *distance = myLidarLite.readDistance();
 }
+#endif
 
 void reboot() {
   wdt_disable();
