@@ -27,6 +27,9 @@ https://github.com/BugCode1/gdrive/releases/tag/2.1.2
 # Info on how to connect G-Mail
 https://learnubuntu.com/send-emails-from-server/
 
+# Setup VNC/VPN access
+https://tailscale.com/download
+
 # Tips and Tricks
 # Sort log on the fly: tail -f all.log | sed /Head:/,+0d
- 
+
