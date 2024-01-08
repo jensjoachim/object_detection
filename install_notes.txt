@@ -31,5 +31,12 @@ https://learnubuntu.com/send-emails-from-server/
 https://tailscale.com/download
 
 # Tips and Tricks
-# Sort log on the fly: tail -f all.log | sed /Head:/,+0d
-
+# Sort log on the fly:
+tail -f all.log | sed /Head:/,+0d
+# Restart USB (Power on/off)
+echo '1-1' > sudo /sys/bus/usb/drivers/usb/unbind
+sleep 2
+echo '1-1' > sudo /sys/bus/usb/drivers/usb/bind
+# Avoid bad frames on webcam
+sudo rmmod uvcvideo
+sudo modprobe uvcvideo nodrop=1 timeout=5000 quirks=0x80

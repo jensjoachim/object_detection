@@ -110,7 +110,7 @@ REC_MAX_LENGTH = 300
 # Max disk space to be used in percent (%) and file system. (Check this will the command "df")
 global REC_DISK_MAX
 global REC_DISK_FILE_SYSTEM
-REC_DISK_MAX = 80
+REC_DISK_MAX = 90
 REC_DISK_FILE_SYSTEM = "/dev/root"
 
 # Google drive upload of recordings
@@ -138,6 +138,9 @@ GMAIL_TRACKING_ENTERED = True
 # Notify uploaded to GDRIVE
 global GMAIL_UPLOAD_DONE
 GMAIL_UPLOAD_DONE = True
+# Notify video recording could non start
+global GMAIL_RECORDING_FAILED
+GMAIL_RECORDING_FAILED = True
 
 # Dumb core info in log
 EN_CORE_PRINT_LOG       = 1
@@ -230,6 +233,7 @@ core_print_info("GMAIL_FROM:                    "+str(GMAIL_FROM))
 core_print_info("GMAIL_TO:                      "+str(GMAIL_TO))
 core_print_info("GMAIL_TRACKING_ENTERED:        "+str(GMAIL_TRACKING_ENTERED))
 core_print_info("GMAIL_UPLOAD_DONE:             "+str(GMAIL_UPLOAD_DONE))
+core_print_info("GMAIL_RECORDING_FAILED:        "+str(GMAIL_RECORDING_FAILED))
 
 def state_print_info(txt):
     
@@ -987,10 +991,14 @@ def rec_disk_space_ok():
 
 def rec_start(image_np):
     global REC_ENABLE
+    global GMAIL_ENABLE
+    global GMAIL_RECORDING_FAILED
     if REC_ENABLE:
         # Check disk space
         if not rec_disk_space_ok():
             core_print_info("rec_start: Failed! No disk space")
+            if GMAIL_ENABLE and GMAIL_RECORDING_FAILED:
+                gmail_send(GMAIL_FROM+" - Upload Failed! No disk space")
             return
         # Try to make directory
         try: 
@@ -1418,13 +1426,40 @@ while True:
         detections_index = tracking_area
     
     # Get frame
-    ret, frame = cap.read()
+    # Sometimes it may not be available
+    for j in range(3):
+        # Try to read it a few times
+        frame_lost = -1
+        for i in range(3):
+            ret, frame = cap.read()
+            if ret == True:
+                break;
+            frame_lost = i
+            time.sleep(0.01)
+        if frame_lost == -1:
+            break;
+        core_print_info("Frames lost: "+str(frame_lost))
+        # Try to restart
+        core_print_info("Trying to restart")
+        cap.release()
+        # Start video capture
+        cap = cv2.VideoCapture(CAM_SELECT)
+        # Set maximum dimmension
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        cap.set(3, 10000)
+        cap.set(4, 10000)# Check actual dimmension 
+        cam_window_width  = int(cap.get(3))
+        cam_window_height = int(cap.get(4))
+        # Enable real-time
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+        
+    
     image_np = np.array(frame)
         
     # Crop input image
     if current_state == TRACKING or current_state == SCANNING:
         area_coord = DET_AREA_COORD[detections_index]
-        image_np_copy = image_np.copy()
+        image_np_copy = image_np.copy() 
         image_np_crop = image_np_copy[area_coord[4]:area_coord[5],area_coord[2]:area_coord[3]]
 
     # Only run one detection per frame
