@@ -33,10 +33,16 @@ https://tailscale.com/download
 # Tips and Tricks
 # Sort log on the fly:
 tail -f all.log | sed /Head:/,+0d
-# Restart USB (Power on/off)
-echo '1-1' > sudo /sys/bus/usb/drivers/usb/unbind
-sleep 2
-echo '1-1' > sudo /sys/bus/usb/drivers/usb/bind
 # Avoid bad frames on webcam
 sudo rmmod uvcvideo
 sudo modprobe uvcvideo nodrop=1 timeout=5000 quirks=0x80
+# Restart USB (Power on/off) (rpi4)
+https://gist.github.com/takeshiyako2/5b78f21814b68d75de3674dde3fffe13
+sudo uhubctl -l 1 -a 0
+sleep 2
+sudo uhubctl -l 1 -a 1
+sleep 2
+sudo uhubctl -l 1-1 -a 0
+sleep 2
+sudo uhubctl -l 1-1 -a 1
+sleep 2

@@ -1263,21 +1263,67 @@ def init_bad_frames_detected():
         bad_frames_detected_arr.append(0)
 
 
+#global cap
+global cam_window_width
+global cam_window_height
 
-# Start video capture
-cap = cv2.VideoCapture(CAM_SELECT)
-# Set maximum dimmension
-cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-cap.set(3, 10000)
-cap.set(4, 10000)
-# Check actual dimmension 
-cam_window_width  = int(cap.get(3))
-cam_window_height = int(cap.get(4))
-# Enable real-time
-cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+def cam_init():
+    global cap
+    global cam_window_width
+    global cam_window_height
+    # Try to close
+    try: 
+        cap.release()
+    except NameError as error: 
+        do_nothing = 1
+    else:
+        core_print_info("cam_init: Closing old caption")
+    # Start video capture
+    core_print_info("cam_init: Starting caption")
+    cap = cv2.VideoCapture(CAM_SELECT)
+    # Set maximum dimmension
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+    cap.set(3, 10000)
+    cap.set(4, 10000)
+    # Check actual dimmension
+    cam_window_width  = int(cap.get(3))
+    cam_window_height = int(cap.get(4))
+    core_print_info('cam_window_width:  '+str(cam_window_width))
+    core_print_info('cam_window_height: '+str(cam_window_height))
+    # Enable real-time
+    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+def cam_read():
+    # Read first frame
+    ret, frame = cap.read()
+    # Check OK
+    if ret == True:
+        return np.array(frame)
+    # Try read second time
+    time.sleep(0.01)
+    ret, frame = cap.read()
+    # Check OK
+    if ret == True:
+        if GMAIL_ENABLE:
+            gmail_send(GMAIL_FROM+" - cam_read - Failed! - Recovered on second frame")
+        return np.array(frame)
+    # Restart caption
+    cam_init()
+    # Check OK
+    if ret == True:
+        if GMAIL_ENABLE:
+            gmail_send(GMAIL_FROM+" - cam_read - Failed! - Recovered on restarting caption")
+        return np.array(frame)
+    # Turn power on/off to USB devices
+    # Remove this line
+    gmail_send(GMAIL_FROM+" - cam_read - Failed! - It did not help to restart caption")
+    # TODO: Add restart of USB
+
     
-core_print_info('cam_window_width:  '+str(cam_window_width))
-core_print_info('cam_window_height: '+str(cam_window_height))
+    # Return something
+    return np.array(frame)
+
+cam_init()
 
 # Init scanning parameters
 init_good_frames_detected()
@@ -1352,8 +1398,7 @@ for area in DET_AREA_COORD:
     detections_list.append([])
     
     # Get frame
-    ret, frame = cap.read()
-    image_np = np.array(frame)
+    image_np = cam_read()
 
     # Crop input image
     area_coord = DET_AREA_COORD[i]
@@ -1426,35 +1471,7 @@ while True:
         detections_index = tracking_area
     
     # Get frame
-    # Sometimes it may not be available
-    for j in range(3):
-        # Try to read it a few times
-        frame_lost = -1
-        for i in range(3):
-            ret, frame = cap.read()
-            if ret == True:
-                break;
-            frame_lost = i
-            time.sleep(0.01)
-        if frame_lost == -1:
-            break;
-        core_print_info("Frames lost: "+str(frame_lost))
-        # Try to restart
-        core_print_info("Trying to restart")
-        cap.release()
-        # Start video capture
-        cap = cv2.VideoCapture(CAM_SELECT)
-        # Set maximum dimmension
-        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        cap.set(3, 10000)
-        cap.set(4, 10000)# Check actual dimmension 
-        cam_window_width  = int(cap.get(3))
-        cam_window_height = int(cap.get(4))
-        # Enable real-time
-        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        
-    
-    image_np = np.array(frame)
+    image_np = cam_read()
         
     # Crop input image
     if current_state == TRACKING or current_state == SCANNING:
