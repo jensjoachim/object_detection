@@ -184,6 +184,12 @@ void loop() {
       set_step_index(STEPS_LOGIC/2);
       Serial.print("Step: ");
       Serial.println(get_step_index());
+    } else if (str.indexOf("set_step:") != -1) {
+      str = str.substring(10);
+      val_int = str.toInt();
+      set_step_index(val_int);
+      Serial.print("Step: ");
+      Serial.println(get_step_index());
     } else { // Rotate Head
       val_int = str.toInt();
       if (val_int < 0) {

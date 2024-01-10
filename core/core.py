@@ -253,10 +253,12 @@ def state_print_info(txt):
         print(txt_dump)
 
 
+# Load Model
+MODEL_AUTO_EN = True
+        
 # Model Selection
 
 # Automatic model selection regarding if testing on PC or RaspberryPi+EdgeTPU
-MODEL_AUTO_EN = True
 if MODEL_AUTO_EN:
     # Assume that Linux is on RaspberryPi
     if os.name == 'posix':
@@ -277,6 +279,7 @@ else:
 
 
 # TFLITE
+global interpreter
 if TFLITE_EN:
     # Import TensorFlow libraries
     # If tflite_runtime is installed, import interpreter from tflite_runtime, else import from regular tensorflow
@@ -1179,6 +1182,9 @@ def keyboard_command(wait_key_in):
         # Rotate Left
         if wait_key_in == ord('d'):
             head_write_int(-1*int(head_logic_steps/32))
+    # Debug
+    if wait_key_in == ord('p'):
+        usb_init_w_reset()
     # Info on screen
     if wait_key_in == ord('i'):
         show_conf = (show_conf + 1) % 4
@@ -1263,7 +1269,6 @@ def init_bad_frames_detected():
         bad_frames_detected_arr.append(0)
 
 
-#global cap
 global cam_window_width
 global cam_window_height
 
@@ -1323,8 +1328,94 @@ def cam_read():
     # Return something
     return np.array(frame)
 
-cam_init()
 
+def usb_init():
+    core_print_info("usb_init - Started")
+    # Start capture
+    cam_init()
+    # Enable HEAD
+    if HEAD_EN == 1:    
+        global head_ready       
+        global head_logic_steps 
+        global head_step_index  
+        global head_step_recv 
+        global head_distance
+        global head_write_scanning_en
+        global head_write_tracking_en
+        if os.name == 'posix':
+            head_init("/dev/ttyUSB0")
+        else:
+            head_init("COM5")
+        global serialPort
+
+def usb_init_w_reset():
+    core_print_info("usb_init_w_reset - Started")
+    # Get stepper index and store
+    global head_step_index
+    head_step_index_tmp = head_step_index
+    core_print_info("usb_init_w_reset - head_step_index: "+str(head_step_index))
+    # Stop USB processes
+    
+    # Try to close
+    global cap
+    try: 
+        cap.release()
+    except NameError as error: 
+        do_nothing = 1
+
+    # Try close serial port if its open
+    global serialPort
+    try:
+        serialPort.close()
+    except NameError:
+        do_nothing = 1
+
+    global interpreter
+    print(type(interpreter))
+    print(dir(interpreter))
+
+        
+    #interpreter.invoke()
+    del(interpreter)
+    #interpreter.getOutputTensorCount()
+    #interpreter.close()
+        
+    time.sleep(2.0)
+        
+    # Power USB hub off/on
+    core_print_info("usb_init_w_reset - USB cmd 1")
+    subprocess.check_output(["sudo", "uhubctl", "-l", "1", "-a", "0"]).decode("utf-8")
+    time.sleep(5.0)
+    core_print_info("usb_init_w_reset - USB cmd 2")
+    subprocess.check_output(["sudo", "uhubctl", "-l", "1", "-a", "1"]).decode("utf-8")
+    time.sleep(5.0)
+    core_print_info("usb_init_w_reset - USB cmd 3")
+    subprocess.check_output(["sudo", "uhubctl", "-l", "1-1", "-a", "0"]).decode("utf-8")
+    time.sleep(5.0)
+    core_print_info("usb_init_w_reset - USB cmd 4")
+    subprocess.check_output(["sudo", "uhubctl", "-l", "1-1", "-a", "1"]).decode("utf-8")
+    time.sleep(5.0)
+
+
+    #sudo uhubctl -l 1 -a 1
+    #sleep 2
+    #sudo uhubctl -l 1-1 -a 1
+
+
+    # Init
+    usb_init()
+    time.sleep(1.0)
+    # Restore stepper index in arduino
+    head_write('set_step: '+str(head_step_index_tmp))
+    time.sleep(0.1)
+    # Read stepper index from Arduino
+    head_read_all()
+    core_print_info("usb_init_w_reset - head_step_index: "+str(head_step_index))
+    
+    
+# Start USB devices Arduino and Webcam
+usb_init()
+ 
 # Init scanning parameters
 init_good_frames_detected()
 init_bad_frames_detected()
@@ -1371,21 +1462,6 @@ core_print_info('debug_window_height: '+str(debug_window_height))
 cycle_time_total = 0
 cycle_time_avg   = 0
 init_time()
-
-# Enable HEAD
-if HEAD_EN == 1:    
-    global head_ready       
-    global head_logic_steps 
-    global head_step_index  
-    global head_step_recv 
-    global head_distance
-    global head_write_scanning_en
-    global head_write_tracking_en
-    if os.name == 'posix':
-        head_init("/dev/ttyUSB0")
-    else:
-        head_init("COM5")
-    global serialPort
     
 # Do one detections for all areas
 detections_index  = 0
@@ -1649,12 +1725,6 @@ while True:
     
 #### End of loop ####
 
-
-
-
-#TODO:
-# - Try to make VNC functioning or SSH
-# - Live stream video
 
 
 
