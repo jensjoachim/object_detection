@@ -20,6 +20,7 @@ from PIL import ImageOps
 # RaspberryPi Camera
 from picamera2 import Picamera2
 from libcamera import Transform
+from libcamera import controls
 
 # For time measurement
 import time
@@ -1321,10 +1322,11 @@ def cam_init():
     if CAM_SELECT == 0:
         # RPI Camera
         cap = Picamera2()
+        #cap.configure(cap.create_preview_configuration(main={"format": 'RGB888', "size": (4608,2592)},transform=Transform(hflip=True,vflip=True)))
+        #cap.configure(cap.create_preview_configuration(main={"format": 'RGB888', "size": (1600,1600)},transform=Transform(hflip=True,vflip=True)))
         cap.configure(cap.create_preview_configuration(main={"format": 'RGB888', "size": (1920,1080)},transform=Transform(hflip=True,vflip=True)))
+        cap.set_controls({"AfMode": controls.AfModeEnum.Continuous, "AfSpeed": controls.AfSpeedEnum.Fast})
         cap.start()
-        #cam_window_width  = 1920
-        #cam_window_height = 1080
         cam_window_width  = cap.camera_config["main"]["size"][0]
         cam_window_height = cap.camera_config["main"]["size"][1]
         core_print_info('cam_window_width:  '+str(cam_window_width))
@@ -1783,5 +1785,4 @@ while True:
 ####### TODO's
 # When hitting "q", please store value of angle on head, to be loaded on next startup
 # CHange polarity on "a" and "d"
-# Higher resolution on RPI cam
-# Better focus on RPI cam
+# Higher resolution on RPI cam -> Will be to slow
