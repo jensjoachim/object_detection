@@ -17,6 +17,10 @@ from PIL import ImageDraw
 from PIL import ImageFont
 from PIL import ImageOps
 
+# RaspberryPi Camera
+from picamera2 import Picamera2
+from libcamera import Transform
+
 # For time measurement
 import time
 from time import process_time_ns
@@ -254,96 +258,124 @@ def state_print_info(txt):
 
 
 # Load Model
+global MODEL_AUTO_EN
 MODEL_AUTO_EN = True
-        
-# Model Selection
+global MODEL_DIR
+global TFLITE_ENv
+global TFLITE_PC
+global interpreter
+global detect_fn
+global tflite_model_height
+global tflite_model_width
+global floating_model
+global input_details
+global output_details
+global boxes_idx
+global classes_idx
+global scores_idx
 
-# Automatic model selection regarding if testing on PC or RaspberryPi+EdgeTPU
-if MODEL_AUTO_EN:
-    # Assume that Linux is on RaspberryPi
-    if os.name == 'posix':
-        TFLITE_EN   = True
-        TFLITE_PC   = False
-        EDGE_TPU_EN = True
-        MODEL_DIR   = '../../18_08_2022_efficientdet-lite1_e75_b32_s2000/'
+def load_model():
+    
+    # Model Selection
+    # Automatic model selection regarding if testing on PC or RaspberryPi+EdgeTPU
+    global MODEL_AUTO_EN
+    global MODEL_DIR
+    global TFLITE_EN
+    global TFLITE_PC
+    if MODEL_AUTO_EN:
+        # Assume that Linux is on RaspberryPi
+        if os.name == 'posix':
+            TFLITE_EN   = True
+            TFLITE_PC   = False
+            EDGE_TPU_EN = True
+            MODEL_DIR   = '../../18_08_2022_efficientdet-lite1_e75_b32_s2000/'
+        else:
+            TFLITE_EN   = True
+            TFLITE_PC   = True
+            EDGE_TPU_EN = False
+            MODEL_DIR   = '../../../../tflite_custom_models/good/18_08_2022_efficientdet-lite1_e75_b32_s2000/'
     else:
         TFLITE_EN   = True
         TFLITE_PC   = True
         EDGE_TPU_EN = False
         MODEL_DIR   = '../../../../tflite_custom_models/good/18_08_2022_efficientdet-lite1_e75_b32_s2000/'
-else:
-    TFLITE_EN   = True
-    TFLITE_PC   = True
-    EDGE_TPU_EN = False
-    MODEL_DIR   = '../../../../tflite_custom_models/good/18_08_2022_efficientdet-lite1_e75_b32_s2000/'
 
-
-# TFLITE
-global interpreter
-if TFLITE_EN:
-    # Import TensorFlow libraries
-    # If tflite_runtime is installed, import interpreter from tflite_runtime, else import from regular tensorflow
-    # If using Coral Edge TPU, import the load_delegate library
-    pkg = importlib.util.find_spec('tflite_runtime')
-    if pkg:
-        from tflite_runtime.interpreter import Interpreter
-        if EDGE_TPU_EN:
-            from tflite_runtime.interpreter import load_delegate
-    else:
-        from tensorflow.lite.python.interpreter import Interpreter
-        if EDGE_TPU_EN:
-            from tensorflow.lite.python.interpreter import load_delegate
-    # Load Model
-    if TFLITE_PC: 
-        if EDGE_TPU_EN:
-            # Edge TPU TFLITE
-            core_print_info('No support for Edge TPU on PC...')
-            exit()
+    # TFLITE
+    global interpreter
+    global detect_fn
+    global tflite_model_height
+    global tflite_model_width
+    global floating_model
+    global input_details
+    global output_details
+    global boxes_idx
+    global classes_idx
+    global scores_idx
+    if TFLITE_EN:
+        # Import TensorFlow libraries
+        # If tflite_runtime is installed, import interpreter from tflite_runtime, else import from regular tensorflow
+        # If using Coral Edge TPU, import the load_delegate library
+        pkg = importlib.util.find_spec('tflite_runtime')
+        if pkg:
+            from tflite_runtime.interpreter import Interpreter
+            if EDGE_TPU_EN:
+                from tflite_runtime.interpreter import load_delegate
         else:
-            # float16 TFLITE
-            interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'model_float16.tflite'))
-            core_print_info('Loading TFLITE Float16...')
-    else:
-        if EDGE_TPU_EN:
-            # Edge TPU TFLITE
-            interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'edge_tpu_2','model_default_edgetpu.tflite'),
+            from tensorflow.lite.python.interpreter import Interpreter
+            if EDGE_TPU_EN:
+                from tensorflow.lite.python.interpreter import load_delegate
+        # Load Model
+        if TFLITE_PC: 
+            if EDGE_TPU_EN:
+                # Edge TPU TFLITE
+                core_print_info('No support for Edge TPU on PC...')
+                exit()
+            else:
+                # float16 TFLITE
+                interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'model_float16.tflite'))
+                core_print_info('Loading TFLITE Float16...')
+        else:
+            if EDGE_TPU_EN:
+                # Edge TPU TFLITE
+                interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'edge_tpu_2','model_default_edgetpu.tflite'),
                                       experimental_delegates=[load_delegate('libedgetpu.so.1.0')])
-            core_print_info('Loading TFLITE for Edge TPU...')
-        else:
-            # Default TFLITE
-            interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'model_default.tflite'))
-            core_print_info('Loading TFLITE Default...')
-    # Allocate    
-    interpreter.allocate_tensors()
-    # Get model details
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
-    height = input_details[0]['shape'][1]
-    width = input_details[0]['shape'][2]
-    core_print_info('H: '+str(height)+' W: '+str(width))
-    tflite_model_height = height
-    tflite_model_width  = width
+                core_print_info('Loading TFLITE for Edge TPU...')
+            else:
+                # Default TFLITE
+                interpreter = Interpreter(model_path=os.path.join(MODEL_DIR,'model_default.tflite'))
+                core_print_info('Loading TFLITE Default...')
+        # Allocate    
+        interpreter.allocate_tensors()
+        # Get model details
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
+        height = input_details[0]['shape'][1]
+        width = input_details[0]['shape'][2]
+        core_print_info('H: '+str(height)+' W: '+str(width))
+        tflite_model_height = height
+        tflite_model_width  = width
 
-    floating_model = (input_details[0]['dtype'] == np.float32)
+        floating_model = (input_details[0]['dtype'] == np.float32)
 
-    input_mean = 127.5
-    input_std = 127.5
+        input_mean = 127.5
+        input_std = 127.5
 
-    # Check output layer name to determine if this model was created with TF2 or TF1,
-    # because outputs are ordered differently for TF2 and TF1 models
-    outname = output_details[0]['name']
+        # Check output layer name to determine if this model was created with TF2 or TF1,
+        # because outputs are ordered differently for TF2 and TF1 models
+        outname = output_details[0]['name']
 
-    if ('StatefulPartitionedCall' in outname): # This is a TF2 model
-        boxes_idx, classes_idx, scores_idx = 1, 3, 0
-    else: # This is a TF1 model
-        boxes_idx, classes_idx, scores_idx = 0, 1, 2
-else:
-    import tensorflow as tf
-    # Print Tensorflow version
-    core_print_info('Tensorflow version: '+tf.__version__)
-    # Init Model
-    detect_fn = tf.saved_model.load(MODEL_DIR+'saved_model/')
+        if ('StatefulPartitionedCall' in outname): # This is a TF2 model
+            boxes_idx, classes_idx, scores_idx = 1, 3, 0
+        else: # This is a TF1 model
+            boxes_idx, classes_idx, scores_idx = 0, 1, 2
+    else:
+        import tensorflow as tf
+        # Print Tensorflow version
+        core_print_info('Tensorflow version: '+tf.__version__)
+        # Init Model
+        detect_fn = tf.saved_model.load(MODEL_DIR+'saved_model/')
 
+load_model()
 
 # Load Labels
 category_index = {}
@@ -1121,7 +1153,8 @@ def keyboard_command(wait_key_in):
     global show_conf
     # Stop
     if wait_key_in == ord('q'):
-        cap.release()
+        if CAM_SELECT != 0:
+            cap.release()
         cv2.destroyAllWindows()
         core_print_info('Exit print')
         
@@ -1216,8 +1249,8 @@ DETECTION_AREA_IN = [[1.00,0.0,0.0],
 
 
 # Camera Select
-CAM_SELECT = 0 # Built-in webcam
-#CAM_SELECT = 1 # External webcam
+CAM_SELECT = 0;     # 0: RPI Camera, 1: USB Camera
+CAM_SELECT_USB = 0; # USB Camera selection 
 
 # Set size of debug video window
 #DEBUG_WINDOW_WIDTH_SET  = 640
@@ -1226,8 +1259,7 @@ DEBUG_WINDOW_WIDTH_SET  = 800
 #DEBUG_WINDOW_WIDTH_SET  = 1600
 DEBUG_WINDOW_MAX_EN     = 0
 
-# Enable connection to HEAD
-# (Arduino controlling stepper mouted with webcam and proximity sensor)
+# Enable connection to HEAD# (Arduino controlling stepper mouted with webcam and proximity sensor)
 HEAD_EN = 1
 HEAD_SEE_COM_PORTS = 1
 
@@ -1277,36 +1309,59 @@ def cam_init():
     global cam_window_width
     global cam_window_height
     # Try to close
-    try: 
-        cap.release()
-    except NameError as error: 
-        do_nothing = 1
-    else:
-        core_print_info("cam_init: Closing old caption")
+    if CAM_SELECT != 0:
+        try: 
+            cap.release()
+        except NameError as error: 
+            do_nothing = 1
+        else:
+            core_print_info("cam_init: Closing old caption")
     # Start video capture
     core_print_info("cam_init: Starting caption")
-    cap = cv2.VideoCapture(CAM_SELECT)
-    # Set maximum dimmension
-    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-    cap.set(3, 10000)
-    cap.set(4, 10000)
-    # Check actual dimmension
-    cam_window_width  = int(cap.get(3))
-    cam_window_height = int(cap.get(4))
-    core_print_info('cam_window_width:  '+str(cam_window_width))
-    core_print_info('cam_window_height: '+str(cam_window_height))
-    # Enable real-time
-    cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    if CAM_SELECT == 0:
+        # RPI Camera
+        cap = Picamera2()
+        cap.configure(cap.create_preview_configuration(main={"format": 'RGB888', "size": (1920,1080)},transform=Transform(hflip=True,vflip=True)))
+        cap.start()
+        #cam_window_width  = 1920
+        #cam_window_height = 1080
+        cam_window_width  = cap.camera_config["main"]["size"][0]
+        cam_window_height = cap.camera_config["main"]["size"][1]
+        core_print_info('cam_window_width:  '+str(cam_window_width))
+        core_print_info('cam_window_height: '+str(cam_window_height))
+        #time.sleep(2)
+    else:
+        # USB Camera
+        cap = cv2.VideoCapture(CAM_SELECT_USB)
+        # Set maximum dimmension
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        cap.set(3, 10000)
+        cap.set(4, 10000)
+        # Check actual dimmension
+        cam_window_width  = int(cap.get(3))
+        cam_window_height = int(cap.get(4))
+        core_print_info('cam_window_width:  '+str(cam_window_width))
+        core_print_info('cam_window_height: '+str(cam_window_height))
+        # Enable real-time
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
 def cam_read():
     # Read first frame
-    ret, frame = cap.read()
+    if CAM_SELECT == 0:
+        frame = cap.capture_array()
+        ret = True
+    else:
+        ret, frame = cap.read()
     # Check OK
     if ret == True:
         return np.array(frame)
     # Try read second time
     time.sleep(0.01)
-    ret, frame = cap.read()
+    if CAM_SELECT == 0:
+        frame = cap.capture_array()
+        ret = True
+    else:
+        ret, frame = cap.read()
     # Check OK
     if ret == True:
         if GMAIL_ENABLE:
@@ -1320,17 +1375,22 @@ def cam_read():
             gmail_send(GMAIL_FROM+" - cam_read - Failed! - Recovered on restarting caption")
         return np.array(frame)
     # Turn power on/off to USB devices
-    # Remove this line
-    gmail_send(GMAIL_FROM+" - cam_read - Failed! - It did not help to restart caption")
-    # TODO: Add restart of USB
-
-    
+    usb_init_w_reset()
+    # Check OK
+    if ret == True:
+        if GMAIL_ENABLE:
+            gmail_send(GMAIL_FROM+" - cam_read - Failed! - Recovered on power cycling of USB devices")
+        return np.array(frame)
+    # All tricks failed
+    gmail_send(GMAIL_FROM+" - cam_read - Failed! - It did not help power cycling of USB devices")
     # Return something
     return np.array(frame)
 
 
 def usb_init():
     core_print_info("usb_init - Started")
+    # Load model
+    load_model()
     # Start capture
     cam_init()
     # Enable HEAD
@@ -1347,6 +1407,8 @@ def usb_init():
         else:
             head_init("COM5")
         global serialPort
+    # Done
+    core_print_info("usb_init - Done")
 
 def usb_init_w_reset():
     core_print_info("usb_init_w_reset - Started")
@@ -1355,62 +1417,51 @@ def usb_init_w_reset():
     head_step_index_tmp = head_step_index
     core_print_info("usb_init_w_reset - head_step_index: "+str(head_step_index))
     # Stop USB processes
-    
-    # Try to close
+    # Try to close caption
     global cap
-    try: 
-        cap.release()
-    except NameError as error: 
-        do_nothing = 1
-
+    if CAM_SELECT != 0:
+        try:
+            cap.release()
+        except NameError as error: 
+            do_nothing = 1
     # Try close serial port if its open
     global serialPort
     try:
         serialPort.close()
     except NameError:
         do_nothing = 1
-
+    # Try close model aka EdgeTPU
     global interpreter
-    print(type(interpreter))
-    print(dir(interpreter))
-
-        
-    #interpreter.invoke()
     del(interpreter)
-    #interpreter.getOutputTensorCount()
-    #interpreter.close()
-        
-    time.sleep(2.0)
-        
+    # Wait short time  
+    time.sleep(1.0) 
     # Power USB hub off/on
     core_print_info("usb_init_w_reset - USB cmd 1")
     subprocess.check_output(["sudo", "uhubctl", "-l", "1", "-a", "0"]).decode("utf-8")
-    time.sleep(5.0)
+    time.sleep(10.0)
     core_print_info("usb_init_w_reset - USB cmd 2")
     subprocess.check_output(["sudo", "uhubctl", "-l", "1", "-a", "1"]).decode("utf-8")
-    time.sleep(5.0)
+    time.sleep(10.0)
     core_print_info("usb_init_w_reset - USB cmd 3")
     subprocess.check_output(["sudo", "uhubctl", "-l", "1-1", "-a", "0"]).decode("utf-8")
-    time.sleep(5.0)
+    time.sleep(10.0)
     core_print_info("usb_init_w_reset - USB cmd 4")
     subprocess.check_output(["sudo", "uhubctl", "-l", "1-1", "-a", "1"]).decode("utf-8")
-    time.sleep(5.0)
-
-
+    time.sleep(10.0)
     #sudo uhubctl -l 1 -a 1
     #sleep 2
     #sudo uhubctl -l 1-1 -a 1
-
-
     # Init
     usb_init()
-    time.sleep(1.0)
+    time.sleep(5.0)
     # Restore stepper index in arduino
     head_write('set_step: '+str(head_step_index_tmp))
-    time.sleep(0.1)
+    time.sleep(1.0)
     # Read stepper index from Arduino
     head_read_all()
     core_print_info("usb_init_w_reset - head_step_index: "+str(head_step_index))
+    # Done
+    core_print_info("usb_init_w_reset - Done")
     
     
 # Start USB devices Arduino and Webcam
@@ -1729,3 +1780,8 @@ while True:
 
 
 
+####### TODO's
+# When hitting "q", please store value of angle on head, to be loaded on next startup
+# CHange polarity on "a" and "d"
+# Higher resolution on RPI cam
+# Better focus on RPI cam
