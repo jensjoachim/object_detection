@@ -857,7 +857,20 @@ def head_init(serialportin):
     head_distance    = 0
     head_print_info('Waiting for HEAD to be up and running...')
     head_wait_for('ready')
-    
+
+    # Set new head step index if avaible
+    if os.path.isfile("head_step_index.txt"):
+        file_step_index = open("head_step_index.txt", "r")
+        head_step_index_tmp = int(file_step_index.read())
+        head_print_info("Stored Head Step Index found: "+str(head_step_index_tmp))
+        file_step_index.close()
+        os.remove("head_step_index.txt")
+        # Write head
+        head_write('set_step: '+str(head_step_index_tmp))
+        # Check incoming messeages, such that step index should be updated locally aswell
+        time.sleep(0.5)
+        head_read_all()
+        
 def head_read():
     
     global head_ready
@@ -1152,7 +1165,7 @@ def keyboard_command(wait_key_in):
     global HEAD_EN
     global head_logic_steps
     global show_conf
-    # Stop
+    # Stop and exit
     if wait_key_in == ord('q'):
         if CAM_SELECT != 0:
             cap.release()
@@ -1165,6 +1178,11 @@ def keyboard_command(wait_key_in):
         except OSError as error: 
             do_nothing = 1  
         shutil.copyfile('all.log','logs/'+log_start_date_str)
+        # Store arduino step index
+        global head_step_index
+        file_step_index = open("head_step_index.txt", "w")
+        file_step_index.write(str(head_step_index))
+        file_step_index.close()
         return 0    
     # Control States
     global IDLE_EN
