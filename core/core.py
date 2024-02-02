@@ -1229,10 +1229,10 @@ def keyboard_command(wait_key_in):
         if wait_key_in == ord('r'):
             head_write('re-center')
         # Rotate Right
-        if wait_key_in == ord('a'):
+        if wait_key_in == ord('d'):
             head_write_int(int(head_logic_steps/32))
         # Rotate Left
-        if wait_key_in == ord('d'):
+        if wait_key_in == ord('a'):
             head_write_int(-1*int(head_logic_steps/32))
     # Debug
     if wait_key_in == ord('p'):
@@ -1801,6 +1801,4 @@ while True:
 
 
 ####### TODO's
-# When hitting "q", please store value of angle on head, to be loaded on next startup
-# CHange polarity on "a" and "d"
 # Higher resolution on RPI cam -> Will be to slow
