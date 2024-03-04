@@ -109,7 +109,9 @@ REC_ENABLE = True
 # Set FPS of video, it will either add duplicate frames or skip frames
 global REC_FPS
 REC_FPS = 5
-# Set maximum time in secs of how long one recording may be.
+# Set minimum and maximum time in secs of how long one recording may be.
+global REC_MIN_LENGTH
+REC_MIN_LENGTH = 3
 global REC_MAX_LENGTH
 REC_MAX_LENGTH = 300
 # Max disk space to be used in percent (%) and file system. (Check this will the command "df")
@@ -227,6 +229,7 @@ core_print_info("HEAD_SCANNING_W_ANGLE:         "+str(HEAD_SCANNING_W_ANGLE))
 core_print_info("IDLE_TIME_DUR:                 "+str(IDLE_TIME_DUR))
 core_print_info("REC_ENABLE:                    "+str(REC_ENABLE))
 core_print_info("REC_FPS:                       "+str(REC_FPS))
+core_print_info("REC_MIN_LENGTH:                "+str(REC_MIN_LENGTH))
 core_print_info("REC_MAX_LENGTH:                "+str(REC_MAX_LENGTH))
 core_print_info("REC_DISK_MAX:                  "+str(REC_DISK_MAX))
 core_print_info("REC_DISK_FILE_SYSTEM:          "+str(REC_DISK_FILE_SYSTEM))
@@ -597,20 +600,27 @@ def draw_general_status(img):
     str_cycle_time_avg   = "Avg. Time: "
     str_cycle_time_total = str_cycle_time_total+str(round(cycle_time_total))
     str_cycle_time_avg = str_cycle_time_avg+str(round(cycle_time_avg))
-    
+
+    # Calc avg fps
+    str_avg_fps = "FPS: "
+    str_avg_fps = str_avg_fps+str(round(1.0/cycle_time_avg*10000)/10)
+
     # Head Status
     global head_logic_steps
     global head_step_index 
     global head_distance
     str_head_angle       = "Angle:     "
+    str_head_angle_short = "Ang: "
     str_head_distance    = "Distance:  "
     if HEAD_EN == 1:    
         head_angle = round(1/head_logic_steps * head_step_index * 360, 1)
-        str_head_angle    = str_head_angle+str(head_angle)
-        str_head_distance = str_head_distance+str(head_distance)
+        str_head_angle       = str_head_angle+str(head_angle)
+        str_head_angle_short = str_head_angle_short+str(head_angle)
+        str_head_distance    = str_head_distance+str(head_distance)
     else:
-        str_head_angle = str_head_angle+"Na"
-        str_head_distance = str_head_distance+"Na"
+        str_head_angle       = str_head_angle+"Na"
+        str_head_angle_short = str_head_angle_short+"Na"
+        str_head_distance    = str_head_distance+"Na"
     
     # Target
     global control_state_mean_x           
@@ -622,8 +632,13 @@ def draw_general_status(img):
     
 
     global show_conf
-    # Current statistic
+    # Only fps and angle
     if show_conf == 0:
+        lines = [
+            str_avg_fps,
+            str_head_angle_short]
+    # Current statistic
+    elif show_conf == 1:
         lines = [
             str_cycle_time_total,
             str_cycle_time_avg,
@@ -632,7 +647,7 @@ def draw_general_status(img):
             str_mean_x,
             str_var_x]
     # Current screen view
-    elif show_conf == 1:
+    elif show_conf == 2:
         global IDLE_EN
         lines = []
         if IDLE_EN == 1:
@@ -663,7 +678,7 @@ def draw_general_status(img):
         lines.append("    d: Rotate right")
         lines.append("    r: Re-center")
     # Debug
-    elif show_conf == 2:
+    elif show_conf == 3:
         lines = ["line01","line02","line03","line04","line05","line06",
                  "line07","line08","line09","line10","line11","line12"]
     # Nothing
@@ -954,6 +969,9 @@ def gmail_notify_tracking_entered(label):
 def gmail_notify_upload_done(label):
     if GMAIL_ENABLE and GMAIL_UPLOAD_DONE:
         gmail_send(GMAIL_FROM+" - Upoad done - "+str(label))
+def gmail_notify_upload_reject(label):
+    if GMAIL_ENABLE and GMAIL_UPLOAD_DONE:
+        gmail_send(GMAIL_FROM+" - Upoad rejected - "+str(label))
 def gmail_send(txt):
     if GMAIL_ENABLE:
         global GMAIL_FROM
@@ -1038,7 +1056,7 @@ def rec_disk_space_ok():
     # All good
     return True
 
-def rec_start(image_np):
+def rec_start(image_np,class_name):
     global REC_ENABLE
     global GMAIL_ENABLE
     global GMAIL_RECORDING_FAILED
@@ -1060,15 +1078,18 @@ def rec_start(image_np):
         global rec_next_sec
         global rec_video
         global rec_start_date_str
-        global rec_next_max        
+        global rec_next_max
+        global rec_next_min
         global rec_running
         global REC_MAX_LENGTH
         rec_running = True
         rec_start_date = datetime.datetime.now()
-        rec_start_date_str = "vid__"+rec_start_date.strftime("%d_%m_%Y__%H_%M_%S")+".avi"
+        #rec_start_date_str = "vid__"+rec_start_date.strftime("%d_%m_%Y__%H_%M_%S")+".avi"
+        rec_start_date_str = "vid__"+class_name+"__"+rec_start_date.strftime("%y_%m_%d__%H_%M_%S")+".avi"
         core_print_info("rec_start - "+rec_start_date_str)
         rec_next_sec = time.time() + (1.0/REC_FPS)
         rec_next_max = time.time() + float(REC_MAX_LENGTH)
+        rec_next_min = time.time() + float(REC_MIN_LENGTH)
         rec_video = cv2.VideoWriter("vids/"+rec_start_date_str,cv2.VideoWriter_fourcc(*'DIVX'), REC_FPS, debug_window_dim)
         rec_add(image_np)
 
@@ -1125,11 +1146,21 @@ def rec_add_frames(image_np):
 def rec_stop():
     global REC_ENABLE
     global rec_running
+    global rec_next_min
+    global rec_next_sec
+    global rec_start_date_str
     if REC_ENABLE and rec_running:
         core_print_info("rec_stop")
         global rec_video
         rec_video.release()
-        rec_upload_google()
+        if rec_next_sec >= rec_next_min:
+            # Upload
+            rec_upload_google()
+        else:
+            # Reject Upload
+            # TODO: Delete file also
+            core_print_info("rec_stop: Upload rejected")
+            gmail_notify_upload_reject(rec_start_date_str)
         rec_running = False
                 
 def rec_check_uploaded_google():
@@ -1788,7 +1819,7 @@ while True:
                     tracking_area = i_tmp
                     init_bad_frames_detected()
                     # Start recording
-                    rec_start(image_np)
+                    rec_start(image_np,class_name_tmp)
 
     # Check if upload of video is done
     rec_check_uploaded_google()
@@ -1801,4 +1832,11 @@ while True:
 
 
 ####### TODO's
+# Add Zoom to dectection area on recording
+# Verify that it does not detect on areas too small
+# Put a catch clause on "serialPort"
+# Perhaps try to use highest resolution for scanning, but use image processor in camera to return specific area. This should give better FPS
+
+####### Rejected updates
+# Maybe set detection sensitivity up -> NO
 # Higher resolution on RPI cam -> Will be to slow
