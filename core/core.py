@@ -1058,6 +1058,8 @@ def rec_disk_space_ok():
 
 def rec_start(image_np,class_name):
     global REC_ENABLE
+    global REC_CLASS_NAME
+    REC_CLASS_NAME = class_name
     global GMAIL_ENABLE
     global GMAIL_RECORDING_FAILED
     if REC_ENABLE:
@@ -1123,6 +1125,7 @@ def rec_add(image_np):
 
 def rec_add_frames(image_np):
     global REC_ENABLE
+    global REC_CLASS_NAME
     global rec_running
     if REC_ENABLE and rec_running:
         global REC_FPS
@@ -1141,7 +1144,7 @@ def rec_add_frames(image_np):
         if rec_next_sec >= rec_next_max:
             core_print_info("rec_add_frames: Max time reached")
             rec_stop()
-            rec_start(image_np)
+            rec_start(image_np,REC_CLASS_NAME)
 
 def rec_stop():
     global REC_ENABLE
